@@ -1,4 +1,6 @@
-# [ZX Spectrum Next](https://www.specnext.com/) port for MiSTer
+# [ZX Spectrum Next](https://www.specnext.com/) for MiSTer
+
+Port of original [ZX Spectrum Next core](https://gitlab.com/SpectrumNext/ZX_Spectrum_Next_FPGA) developed by Alvin Albrecht, Victor Trucco and Fabio Belavenuto.
 
 ## MiSTer specifics
 - Uses SDRAM instead of SRAM. Some wait states are added in 14MHz and 28MHz modes.
