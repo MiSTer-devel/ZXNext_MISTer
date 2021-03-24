@@ -17,6 +17,22 @@ boot configuration you have to re-load the core.
 - Unpack and place boot.vhd into `/Games/ZXNext` folder. Alternatively you can rename it to ZXNext.vhd and place into root of SD card.
 
 
+## SD card
+Original core is written with direct access to SD card. MiSTer(Linux) doesn't allow to access main SD card directly as it will be corrupted.
+You may use secondary SD card (on I/O board) directly in this core. Make sure you've deleted/renamed ZXNext.vhd in the root and Games/ZXNext/boot.vhd.
+If core cannot find these files, then secondary SD card will be used instead.
+
+
+## Reset
+For unknown reason Next developers decided to remove hard reset logic from the core, so it's impossible to initiate a full hard reset now.
+It means you can choose the other emulated hardware only when core is reloaded. It also means if new vhd image contains significantly different ROM files
+than boot image, then it may have issues. So you have to reload the core in order to use other vhd image correctly.
+It's not a MiSTer issue.
+
+**Hint:** press space when you see a boot screen (you will be transferred to system selector), then open OSD and choose another vhd image and then choose reset 
+(or enable "Reset after Mount" option to automatically reset the core).
+
+
 ## Hotkeys
 * F1 - reset
 * F3 - toggle 50Hz/60Hz modes
