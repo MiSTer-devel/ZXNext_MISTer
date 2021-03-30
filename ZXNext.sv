@@ -249,18 +249,16 @@ wire [31:0] sd_lba;
 wire        sd_rd;
 wire        sd_wr;
 wire        sd_ack;
-wire  [8:0] sd_buff_addr;
-wire  [7:0] sd_buff_dout;
-wire  [7:0] sd_buff_din;
+wire  [7:0] sd_buff_addr;
+wire [15:0] sd_buff_dout;
+wire [15:0] sd_buff_din;
 wire        sd_buff_wr;
 wire        img_mounted;
-wire        img_readonly;
 wire [63:0] img_size;
-wire        sd_ack_conf;
 
 wire [21:0] gamma_bus;
 
-hps_io #(.STRLEN($size(CONF_STR)>>3)) hps_io
+hps_io #(.STRLEN($size(CONF_STR)>>3), .WIDE(1)) hps_io
 (
 	.clk_sys(clk_sys),
 	.HPS_BUS(HPS_BUS),
@@ -279,13 +277,11 @@ hps_io #(.STRLEN($size(CONF_STR)>>3)) hps_io
 	.sd_rd(sd_rd),
 	.sd_wr(sd_wr),
 	.sd_ack(sd_ack),
-	.sd_ack_conf(sd_ack_conf),
 	.sd_buff_addr(sd_buff_addr),
 	.sd_buff_dout(sd_buff_dout),
 	.sd_buff_din(sd_buff_din),
 	.sd_buff_wr(sd_buff_wr),
 	.img_mounted(img_mounted),
-	.img_readonly(img_readonly),
 	.img_size(img_size),
 
 	.ps2_key(ps2_key),
@@ -452,10 +448,13 @@ wire sdmiso = vsd_sel ? vsdmiso : SD_MISO;
 wire sdss;
 
 reg vsd_sel = 0;
-always @(posedge clk_sys) if(img_mounted) vsd_sel <= |img_size;
+always @(posedge clk_sys) begin
+	if(img_mounted) vsd_sel <= |img_size;
+	if(RESET) vsd_sel <= 0;
+end
 
 wire vsdmiso;
-sd_card sd_card
+sd_card #(.WIDE(1)) sd_card
 (
 	.*,
 	.clk_spi(CLK_56),
