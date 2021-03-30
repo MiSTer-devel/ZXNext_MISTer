@@ -153,7 +153,7 @@ architecture rtl of zxnext_top is
    
    signal ps2_kbd_col            : std_logic_vector(6 downto 0);
    signal ps2_kbd_fn             : std_logic_vector(11 downto 1);
-   
+
    signal zxn_keymap_addr        : std_logic_vector(8 downto 0);
    signal zxn_keymap_dat         : std_logic_vector(7 downto 0);
    signal zxn_keymap_we          : std_logic;
@@ -382,17 +382,16 @@ begin
    -- TBBLUE / ZXNEXT -----------------------------------------
    ------------------------------------------------------------
 
-   --  F1 = hard reset (it seems removed and acts as soft reset now)
+   --  F1 = 
    --  F2 = 
    --  F3 = toggle 50Hz / 60Hz display
-   --  F4 = 
+   --  F4 = soft reset
    --  F5 = 
    --  F6 = 
    --  F7 = 
    --  F8 = change cpu speed
-   --  F9 = 
+   --  F9 = m1 button (multiface nmi)
    -- F10 = drive button (divmmc nmi)
-	-- F11 = m1 button (multiface nmi)
 
    zxnext : entity work.zxnext
    generic map
@@ -425,8 +424,8 @@ begin
       
       -- SPECIAL KEYS
 
-      i_SPKEY_FUNCTION     => ps2_kbd_fn(10) & ps2_kbd_fn(11) & ps2_kbd_fn(8) & "0000" & ps2_kbd_fn(3) & '0' & ps2_kbd_fn(1),
-      i_SPKEY_BUTTONS      => ps2_kbd_fn(10) & ps2_kbd_fn(11),
+      i_SPKEY_FUNCTION     => ps2_kbd_fn(10) & ps2_kbd_fn(9) & ps2_kbd_fn(8) & "000" & ps2_kbd_fn(4) & ps2_kbd_fn(3) & "00",
+      i_SPKEY_BUTTONS      => ps2_kbd_fn(10) & ps2_kbd_fn(9),
       
       -- MEMBRANE KEYBOARD
       

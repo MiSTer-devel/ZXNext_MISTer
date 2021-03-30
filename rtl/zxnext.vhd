@@ -5354,18 +5354,48 @@ begin
       end if;
    end process;
 
-   -- Machine Type
+   -- Machine Type (port decoding, roms)
 
-   machine_type_48 <= '1' when nr_03_machine_type(2 downto 1) = "00" else '0';   -- 48k
-   machine_type_128 <= '1' when nr_03_machine_type = "010" or nr_03_machine_type = "100" else '0';  -- 128k or pentagon
-   machine_type_p3 <= '1' when nr_03_machine_type = "011" else '0';   -- +3
-
-   -- Machine Timing
+   process (nr_03_machine_type)
+   begin
    
-   machine_timing_48 <= '1' when nr_03_machine_timing(2 downto 1) = "00" else '0';
-   machine_timing_128 <= '1' when nr_03_machine_timing = "010" else '0';
-   machine_timing_p3 <= '1' when nr_03_machine_timing = "011" else '0';
-   machine_timing_pentagon <= '1' when nr_03_machine_timing = "100" else '0';
+      machine_type_48 <= '0';
+      machine_type_128 <= '0';
+      machine_type_p3 <= '0';
+      
+      case nr_03_machine_type is
+         when "000" | "001" =>
+            machine_type_48 <= '1';
+         when "010" | "100" =>
+            machine_type_128 <= '1';
+         when others =>
+            machine_type_p3 <= '1';
+      end case;
+      
+   end process;
+
+   -- Machine Timing (video frame, contention patterns)
+   
+   process (nr_03_machine_timing)
+   begin
+   
+      machine_timing_48 <= '0';
+      machine_timing_128 <= '0';
+      machine_timing_p3 <= '0';
+      machine_timing_pentagon <= '0';
+      
+      case nr_03_machine_timing is
+         when "000"  | "001" =>
+            machine_timing_48 <= '1';
+         when "010" =>
+            machine_timing_128 <= '1';
+         when "100" =>
+            machine_timing_pentagon <= '1';
+         when others =>
+            machine_timing_p3 <= '1';
+      end case;
+   
+   end process;
    
    -- CPU Speed
    

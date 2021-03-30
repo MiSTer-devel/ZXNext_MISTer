@@ -1,12 +1,16 @@
 --
 -- Z80 compatible microprocessor core
 --
--- Version : 0242
---
 -- Copyright (c) 2001-2002 Daniel Wallner (jesus@opencores.org)
 --
 -- Modifications for the ZX Spectrum Next Project
 -- Copyright 2020 Fabio Belavenuto, Victor Trucco, Charlie Ingley, Garry Lancaster, ACX
+--
+-- Version 350.
+-- Copyright (c) 2018 Sorgelig
+--  Test passed: ZEXDOC, ZEXALL, Z80Full(*), Z80memptr
+--  (*) Currently only SCF and CCF instructions aren't passed X/Y flags check as
+--      correct implementation is still unclear.
 --
 -- All rights reserved
 --
@@ -214,12 +218,14 @@ package T80N_Pack is
       I_RLD       : out std_logic;
       I_RRD       : out std_logic;
       I_INRC         : out std_logic;
+      SetWZ       : out std_logic_vector(1 downto 0);
       SetDI       : out std_logic;
       SetEI       : out std_logic;
       IMode       : out std_logic_vector(1 downto 0);
       Halt        : out std_logic;
       NoRead         : out std_logic;
       Write       : out std_logic;
+      No_PC       : out std_logic;
       XYbit_undoc    : out std_logic;
       
       -- entended functions
@@ -249,6 +255,8 @@ package T80N_Pack is
    port(
       Arith16     : in std_logic;
       Z16         : in std_logic;
+      WZ       : in  std_logic_vector(15 downto 0);
+      XY_State : in  std_logic_vector(1 downto 0);
       ALU_Op      : in std_logic_vector(3 downto 0);
       IR       : in std_logic_vector(5 downto 0);
       ISet     : in std_logic_vector(1 downto 0);

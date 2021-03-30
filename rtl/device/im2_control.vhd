@@ -174,8 +174,8 @@ begin
          when S_ED4D_T4 =>
 --          state_next <= S_0;
             state_next <= S_SRL_T1;
-         -- On the zx next, the dma can be interrupted by devices and this
-         -- prevents an accumulation of return addresses on the stack.
+         -- On the zx next, the dma can be interrupted by devices.
+         -- These extra states prevent an accumulation of return addresses on the stack.
          when S_SRL_T1 =>
             state_next <= S_SRL_T2;
          when S_SRL_T2 =>

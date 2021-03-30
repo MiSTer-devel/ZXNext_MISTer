@@ -99,9 +99,7 @@ begin
    begin
       case state is
          when S_0 =>
-            if i_m1_n = '1' and i_int_req = '1' then
-               state_next <= S_REQ;
-            elsif i_int_req = '1' then
+            if i_int_req = '1' then
                state_next <= S_PEND;
             else
                state_next <= S_0;

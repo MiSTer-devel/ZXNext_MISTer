@@ -70,8 +70,7 @@ architecture rtl of ps2_keyb is
    
    signal ps2_keymap_data        : std_logic_vector(8 downto 0);
    
-   signal ps2_current_keycode    : std_logic_vector(9 downto 0);
-   
+   signal ps2_valid              : std_logic;
    signal ps2_key_valid          : std_logic;
    signal ps2_matrix_reset       : std_logic;
    
@@ -85,9 +84,9 @@ begin
    process (i_CLK)
    begin
       if rising_edge(i_CLK) then
-         ps2_stb1       <= ps2_key(10);
-         ps2_stb2       <= ps2_stb1;
-         ps2_key_valid  <= ps2_stb2 xor ps2_stb1;
+         ps2_stb1  <= ps2_key(10);
+         ps2_stb2  <= ps2_stb1;
+         ps2_valid <= ps2_stb2 xor ps2_stb1;
       end if;
    end process;
    
@@ -95,7 +94,7 @@ begin
 	ps2_key_extend   <= ps2_key(8);
 	ps2_receive_data <= ps2_key(7 downto 0);
 
-   ps2_current_keycode <= ps2_key_release & ps2_key_extend & ps2_receive_data;
+	ps2_key_valid    <= '1' when ps2_valid = '1' and ps2_keymap_data(7 downto 6) /= "11" else '0';
    ps2_matrix_reset <= '1' when ps2_key_valid = '1' and ps2_key_extend = '1' and ps2_receive_data = X"77" else '0';
 
 

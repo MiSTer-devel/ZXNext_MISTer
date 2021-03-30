@@ -1,12 +1,16 @@
 --
 -- Z80 compatible microprocessor core
 --
--- Version : 0247
---
 -- Copyright (c) 2001-2002 Daniel Wallner (jesus@opencores.org)
 --
 -- Modifications for the ZX Spectrum Next Project
 -- Copyright 2020 Fabio Belavenuto, Victor Trucco, Charlie Ingley, Garry Lancaster, ACX
+--
+-- Version 350.
+-- Copyright (c) 2018 Sorgelig
+--  Test passed: ZEXDOC, ZEXALL, Z80Full(*), Z80memptr
+--  (*) Currently only SCF and CCF instructions aren't passed X/Y flags check as
+--      correct implementation is still unclear.
 --
 -- All rights reserved
 --
@@ -87,6 +91,8 @@ entity T80N_ALU is
    port(
       Arith16     : in std_logic;
       Z16         : in std_logic;
+      WZ       : in  std_logic_vector(15 downto 0);
+      XY_State : in  std_logic_vector(1 downto 0);
       ALU_Op      : in std_logic_vector(3 downto 0);
       IR       : in std_logic_vector(5 downto 0);
       ISet     : in std_logic_vector(1 downto 0);
@@ -146,7 +152,7 @@ begin
    AddSub(BusA(7 downto 7), BusB(7 downto 7), ALU_Op(1), Carry7_v, Q_v(7 downto 7), Carry_v);
    OverFlow_v <= Carry_v xor Carry7_v;
 
-   process (Arith16, ALU_OP, F_In, BusA, BusB, IR, Q_v, Carry_v, HalfCarry_v, OverFlow_v, BitMask, ISet, Z16)
+   process (Arith16, ALU_OP, F_In, BusA, BusB, IR, Q_v, Carry_v, HalfCarry_v, OverFlow_v, BitMask, ISet, Z16, XY_State, WZ)
       variable Q_t : std_logic_vector(7 downto 0);
       variable DAA_Q : unsigned(8 downto 0);
    begin
@@ -284,9 +290,10 @@ begin
          end if;
          F_Out(Flag_H) <= '1';
          F_Out(Flag_N) <= '0';
-         F_Out(Flag_X) <= '0';
-         F_Out(Flag_Y) <= '0';
-         if IR(2 downto 0) /= "110" then
+         if IR(2 downto 0) = "110" or XY_State /= "00" then
+            F_Out(Flag_X) <= WZ(11);
+            F_Out(Flag_Y) <= WZ(13);
+         else
             F_Out(Flag_X) <= BusB(3);
             F_Out(Flag_Y) <= BusB(5);
          end if;

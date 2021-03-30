@@ -23,8 +23,8 @@
 -- when the physical membrane is scanned, the ps2 inserts column data
 -- caps + sym shift presses are counted; shifts are not lost in multiple keys
 -- typematic filtered so that shift counts remain accurate
--- F11 = multiface nmi button, F12 = divmmc nmi button
--- function keys work as on membrane: F11 + number
+-- F9 = multiface nmi button, F10 = divmmc nmi button
+-- function keys work as on membrane: F9 + number but are also programmable
 -- pause/break resets the ps2 matrix state
 
 library ieee;
@@ -51,10 +51,13 @@ entity ps2_keyb is
       o_ps2_data_out_en : out std_logic;
       o_ps2_data_out    : out std_logic;
       -- membrane interaction
-      o_mf_nmi_n        : out std_logic;
-      o_divmmc_nmi_n    : out std_logic;
       i_membrane_row    : in std_logic_vector(2 downto 0);
       o_membrane_col    : out std_logic_vector(6 downto 0);
+      -- nmi button simulation
+      o_mf_nmi_n        : out std_logic;
+      o_divmmc_nmi_n    : out std_logic;
+      -- function key simulation
+      o_ps2_func_keys_n : out std_logic_vector(7 downto 0);
       -- programmable keymap
       i_keymap_addr     : in std_logic_vector(8 downto 0);
       i_keymap_data     : in std_logic_vector(7 downto 0);
@@ -81,7 +84,9 @@ architecture rtl of ps2_keyb is
    signal ps2_current_keycode    : std_logic_vector(9 downto 0);
    signal ps2_last_keycode       : std_logic_vector(9 downto 0);
    
+   signal ps2_code_valid         : std_logic;
    signal ps2_key_valid          : std_logic;
+   signal ps2_fk_valid           : std_logic;
    signal ps2_matrix_reset       : std_logic;
    
    signal ps2_receive_valid      : std_logic;
@@ -89,9 +94,9 @@ architecture rtl of ps2_keyb is
    signal ps2_receive_valid_re   : std_logic;
    signal ps2_receive_data       : std_logic_vector(7 downto 0);
    signal ps2_send_valid         : std_logic;
-   
-   signal ps2_data_07            : std_logic;
-   signal ps2_data_78            : std_logic;
+
+   signal ps2_data_01            : std_logic;
+   signal ps2_data_09            : std_logic;
    signal ps2_data_aa            : std_logic;
    signal ps2_data_e0            : std_logic;
    signal ps2_data_e1            : std_logic;
@@ -109,14 +114,15 @@ architecture rtl of ps2_keyb is
 
 begin
 
-   -- nmi buttons simulated via F11 and F12
+   -- nmi buttons simulated via F9 and F10
+   -- these must be singled out to detect them the same way as the button presses
    
    process (i_CLK)
    begin
       if rising_edge(i_CLK) then
          if i_reset = '1' or ps2_matrix_reset = '1' then
             o_mf_nmi_n <= '1';
-         elsif ps2_key_valid = '1' and ps2_key_extend = '0' and ps2_data_78 = '1' then
+         elsif ps2_key_valid = '1' and ps2_key_extend = '0' and ps2_data_01 = '1' then
             o_mf_nmi_n <= ps2_key_release;
          end if;
       end if;
@@ -127,7 +133,7 @@ begin
       if rising_edge(i_CLK) then
          if i_reset = '1' or ps2_matrix_reset = '1' then
             o_divmmc_nmi_n <= '1';
-         elsif ps2_key_valid = '1' and ps2_key_extend = '0' and ps2_data_07 = '1' then
+         elsif ps2_key_valid = '1' and ps2_key_extend = '0' and ps2_data_09 = '1' then
             o_divmmc_nmi_n <= ps2_key_release;
          end if;
       end if;
@@ -189,6 +195,19 @@ begin
                      (matrix_state(to_integer(unsigned(i_membrane_row)))(1) and (row_7_n or symshift_count_zero)) & 
                      (matrix_state(to_integer(unsigned(i_membrane_row)))(0) and (row_0_n or capshift_count_zero));
 
+   -- ps2 function keys
+   
+   process (i_CLK)
+   begin
+      if rising_edge(i_CLK) then
+         if i_reset = '1' or ps2_matrix_reset = '1' then
+            o_ps2_func_keys_n <= (others => '1');
+         elsif ps2_fk_valid = '1' then
+            o_ps2_func_keys_n(to_integer(unsigned(ps2_keymap_data(2 downto 0)))) <= ps2_key_release;
+         end if;
+      end if;
+   end process;
+
    -- ps2 keymap
 
    keymap: entity work.keymaps
@@ -210,13 +229,17 @@ begin
       if rising_edge(i_CLK) then
          if i_reset = '1' or ps2_matrix_reset = '1' then
             ps2_last_keycode <= (others => '1');
-         elsif ps2_key_valid = '1' then
+         elsif ps2_code_valid = '1' then
             ps2_last_keycode <= ps2_current_keycode;   -- eliminate typematic
          end if;
       end if;
    end process;
 
-   ps2_key_valid <= '1' when (state = KM_READ) and ((ps2_last_keycode /= ps2_current_keycode) or ps2_key_release = '1') else '0';
+   ps2_code_valid <= '1' when (state = KM_READ) and ((ps2_last_keycode /= ps2_current_keycode) or ps2_key_release = '1') else '0';
+   
+   ps2_key_valid <= '1' when ps2_code_valid = '1' and ps2_keymap_data(7 downto 6) /= "11" else '0';
+   ps2_fk_valid <= '1' when ps2_code_valid = '1' and ps2_keymap_data(7 downto 6) = "11" else '0';
+
    ps2_matrix_reset <= ps2_key_valid and ps2_data_e1;
    
    -- ps2 interface
@@ -285,15 +308,15 @@ begin
 
    process (ps2_receive_data)
    begin
-      ps2_data_07 <= '0';
-      ps2_data_78 <= '0';
+      ps2_data_01 <= '0';
+      ps2_data_09 <= '0';
       ps2_data_aa <= '0';
       ps2_data_e0 <= '0';
       ps2_data_e1 <= '0';
       ps2_data_f0 <= '0';
       case ps2_receive_data is
-         when X"07" => ps2_data_07 <= '1';
-         when X"78" => ps2_data_78 <= '1';
+         when X"01" => ps2_data_01 <= '1';
+         when X"09" => ps2_data_09 <= '1';
          when X"AA" => ps2_data_aa <= '1';
          when X"E0" => ps2_data_e0 <= '1';
          when X"E1" => ps2_data_e1 <= '1';

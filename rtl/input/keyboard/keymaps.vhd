@@ -51,31 +51,59 @@ architecture Behavior of keymaps is
    type ram_t is array (0 to 511) of std_logic_vector(8 downto 0);
    -- keycode set 2 us keyboard
    signal ram_q : ram_t := (
+   --
    -- Format:
-   -- bit 8    = (reserved)
-   -- bit 7    = SYMBOL
-   -- bit 6    = CAPS
+   --
+   -- CASE 1 - Keypress
+   --
+   -- bit 8    = 0 (reserved)
+   -- bit 7    = SYMBOL  \  must not be
+   -- bit 6    = CAPS    /  "11"
    -- bits 5-3 = row
    -- bits 2-0 = col (only 0-6)
-   -- No extended
+   --
+   -- CASE 2 - Function Key
+   --
+   -- bit 8    = 0 (reserved)
+   -- bit 7    = 1
+   -- bit 6    = 1
+   -- bits 5-3 = 0 (reserved)
+   -- bits 2-0 = function key 8:1
+   --            F1 = hard reset
+   --            F2 = toggle scandoubler, hdmi reset
+   --            F3 = toggle 50Hz / 60Hz display
+   --            F4 = soft reset
+   --            F5 = (temporary) expansion bus on
+   --            F6 = (temporary) expansion bus off
+   --            F7 = change scanline weight
+   --            F8 = change cpu speed
    
-   -- Left / Right Shift = CAPS SHIFT
-   -- Left / Right Ctl = SYM SHIFT
-   -- Left Alt = EXTEND
-   -- Right Alt = GRAPH
-   -- ;",. mapped to appropriate keys
-   -- Arrows mapped to ARROWS
-   -- Caps lock to CAPS LOCK
-   -- Backspace to DELETE
-   -- Esc = BREAK
-   -- ` = EDIT (to left of 1)
-   -- Tab = TRUE VIDEO
-   -- \ = INV VIDEO (right side of same row as tab)
+   -- U.S. PS/2 ASSIGNMENTS
+   --
+   --    Left / Right Shift = CAPS SHIFT
+   --    Left / Right Ctl   = SYM SHIFT
+   --    Left Alt           = EXTEND
+   --    Right Alt          = GRAPH
+   --    ;",. mapped to appropriate keys
+   --    Arrows             = ARROW KEYS
+   --    Caps lock          = CAPS LOCK
+   --    Backspace          = DELETE
+   --    Esc                = BREAK
+   --    `~                 = EDIT (to left of 1)
+   --    Tab                = TRUE VIDEO
+   --    \                  = INV VIDEO (right side of same row as tab)
+   --
+   --    F4  = soft reset
+   --    F8  = cpu speed
+   --    F9  = reserved (multiface nmi)
+   --    F10 = reserved (divmmc nmi)
+   --    F11 = expansion bus on
+   --    F12 = expansion bus off
 
 --                    F9                        F5           F3           F1           F2           F12
-        "000000111", "000000111", "000000111", "000000111", "000000111", "000000111", "000000111", "000000111",   -- 00..07
+        "000000111", "000000111", "000000111", "000000111", "000000111", "000000111", "000000111", "011000101",   -- 00..07
 --                    F10          F8           F6           F4           Tab          ` ~
-        "000000111", "000000111", "000000111", "000000111", "000000111", "000010101", "000011110", "000000111",   -- 08..0F
+        "000000111", "000000111", "011000111", "000000111", "011000011", "000010101", "000011110", "000000111",   -- 08..0F
 --                    LAlt         LShft                     LCtrl        Q            1 !
         "000000111", "000000101", "001000111", "000000111", "010000111", "000010000", "000011000", "000000111",   -- 10..17
 --                                 Z            S            A            W            2 @
@@ -103,7 +131,7 @@ architecture Behavior of keymaps is
 --       [0]          [.]          [2]          [5]          [6]          [8]          Esc          NumLock
         "000100000", "000101110", "000011001", "000011100", "000100100", "000100010", "000011101", "000000111",   -- 70..77
 --       F11          [+]          [3]          [-]          [*]          [9]          ScrLk
-        "000000111", "010110010", "000011010", "010110011", "010111100", "000100001", "000000111", "000000111",   -- 78..7F
+        "011000100", "010110010", "000011010", "010110011", "010111100", "000100001", "000000111", "000000111",   -- 78..7F
 --                                              F7
         "000000111", "000000111", "000000111", "000000111", "000000111", "000000111", "000000111", "000000111",   -- 80..87
         "000000111", "000000111", "000000111", "000000111", "000000111", "000000111", "000000111", "000000111",   -- 88..8F
