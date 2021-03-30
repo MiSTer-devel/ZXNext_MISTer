@@ -73,25 +73,33 @@ reg  [1:0] bank;
 reg [15:0] data;
 reg        we;
 reg        ram_req=0;
+reg [20:1] last_a[2] = '{'1,'1};
+reg  [8:0] rfsh_cnt;
+
+wire       fetch_req = (RAM_A_RD_n || last_a[0] != RAM_A_ADDR[20:1]);
 
 // access manager
 always @(posedge clk) begin
 	reg old_ref;
-	reg        old_req;
-	reg [20:1] last_a[2] = '{'1,'1};
+	reg        old_b_req;
+	reg        old_a_req;
 	reg [15:0] last_data[2];
 	reg [15:0] data_reg;
 	reg        ch0_busy;
 	reg        ch1_busy;
-	reg  [8:0] rfsh_cnt;
 
 	data_reg <= SDRAM_DQ;
 
-	if(RAM_A_REQ) RAM_A_WAIT <= 1;
 	if(~&rfsh_cnt) rfsh_cnt <= rfsh_cnt + 1'd1;
 
-	if((old_req ^ RAM_B_REQ) && (last_a[1] == RAM_B_ADDR[20:1])) begin
-		old_req <= RAM_B_REQ;
+	old_a_req <= RAM_A_REQ;
+	if(~old_a_req & RAM_A_REQ) begin
+		if(rfsh_cnt[8] || fetch_req) RAM_A_WAIT <= 1;
+		else RAM_A_DO <= RAM_A_ADDR[0] ? last_data[0][15:8] : last_data[0][7:0];
+	end
+
+	if((old_b_req ^ RAM_B_REQ) && (last_a[1] == RAM_B_ADDR[20:1])) begin
+		old_b_req <= RAM_B_REQ;
 		RAM_B_DO <= RAM_B_ADDR[0] ? last_data[1][15:8] : last_data[1][7:0];
 	end
 
@@ -101,24 +109,25 @@ always @(posedge clk) begin
 		ch0_busy <= 0;
 		ch1_busy <= 0;
 
-		if((old_req ^ RAM_B_REQ) && (last_a[1] != RAM_B_ADDR[20:1])) begin
-			old_req <= RAM_B_REQ;
+		if((old_b_req ^ RAM_B_REQ) && (last_a[1] != RAM_B_ADDR[20:1])) begin
+			old_b_req <= RAM_B_REQ;
 			{bank,a} <= RAM_B_ADDR;
 			ram_req <= 1;
 			last_a[1] <= RAM_B_ADDR[20:1];
 			ch1_busy <= 1;
 			state <= STATE_START;
 		end
-		else if(RAM_A_REQ | RAM_A_WAIT) begin
+		else if((~old_a_req && RAM_A_REQ && (fetch_req || rfsh_cnt[8])) || RAM_A_WAIT) begin
 			we <= RAM_A_RD_n;
 			{bank,a} <= RAM_A_ADDR;
 			data <= {RAM_A_DI,RAM_A_DI};
-			ram_req <= RAM_A_RD_n || (last_a[0] != RAM_A_ADDR[20:1]);
+			ram_req <= fetch_req;
 			last_a[0] <= RAM_A_RD_n ? '1 : RAM_A_ADDR[20:1];
 			ch0_busy <= 1;
 			state <= STATE_START;
 		end
 		else if(&rfsh_cnt) begin
+			rfsh_cnt <= 0;
 			state <= STATE_START;
 		end
 	end
