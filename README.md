@@ -34,11 +34,11 @@ It's not a MiSTer issue.
 
 
 ## Hotkeys
-* F1 - reset
 * F3 - toggle 50Hz/60Hz modes
+* F4 - reset
 * F8 - change CPU speed: 3.5MHz, 7MHz, 14MHz, 28MHz
+* F9 - NMI/Multiface
 * F10 - DivMMC NMI
-* F11 - NMI/Multiface
 
 
 ## Original specs:
