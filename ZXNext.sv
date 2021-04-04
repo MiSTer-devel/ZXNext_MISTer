@@ -334,6 +334,7 @@ zxnext_top zxnext_top
 	.sd_sclk_o     (sdclk),
 	.sd_mosi_o     (sdmosi),
 	.sd_miso_i     (sdmiso),
+	.sd_octal_i    (sdoctal),
 
 	.audio_L       (aud_l),
 	.audio_R       (aud_r),
@@ -441,10 +442,14 @@ video_freak video_freak
 	.SCALE(status[27:26])
 );
 
-wire sdclk;
-wire sdmosi;
-wire sdmiso = vsd_sel ? vsdmiso : SD_MISO;
-wire sdss;
+
+localparam VSD_OCTAL = 1;
+
+wire       sdclk;
+wire       sdoctal = vsd_sel && VSD_OCTAL;
+wire [7:0] sdmosi;
+wire [7:0] sdmiso = vsd_sel ? vsdmiso : {7'b1111111, SD_MISO};
+wire       sdss;
 
 reg vsd_sel = 0;
 always @(posedge clk_sys) begin
@@ -452,11 +457,11 @@ always @(posedge clk_sys) begin
 	if(RESET) vsd_sel <= 0;
 end
 
-wire vsdmiso;
-sd_card #(.WIDE(1)) sd_card
+wire [7:0] vsdmiso;
+sd_card #(.WIDE(1), .OCTAL(VSD_OCTAL)) sd_card
 (
 	.*,
-	.clk_spi(CLK_56),
+	.clk_spi(clk_sys),
 	.sdhc(1),
 	.sck(sdclk),
 	.ss(sdss | ~vsd_sel),
@@ -464,18 +469,16 @@ sd_card #(.WIDE(1)) sd_card
 	.miso(vsdmiso)
 );
 
-assign SD_CS   = sdss   |  vsd_sel;
-assign SD_SCK  = sdclk  & ~vsd_sel;
-assign SD_MOSI = sdmosi & ~vsd_sel;
+assign SD_CS   = sdss      |  vsd_sel;
+assign SD_SCK  = sdclk     & ~vsd_sel;
+assign SD_MOSI = sdmosi[0] & ~vsd_sel;
 
 reg sd_act;
-
-always @(posedge CLK_56) begin
-	reg old_mosi, old_miso;
+always @(posedge clk_sys) begin
+	reg old_clk;
 	integer timeout = 0;
 
-	old_mosi <= sdmosi;
-	old_miso <= sdmiso;
+	old_clk <= sdclk;
 
 	sd_act <= 0;
 	if(timeout < 1000000) begin
@@ -483,7 +486,7 @@ always @(posedge CLK_56) begin
 		sd_act <= 1;
 	end
 
-	if((old_mosi ^ sdmosi) || (old_miso ^ sdmiso)) timeout <= 0;
+	if(sdss & (old_clk ^ sdclk)) timeout <= 0;
 end
 
 wire tape_in;

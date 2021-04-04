@@ -114,14 +114,15 @@ entity zxnext is
       
       -- SPI
 
+      i_SPI_OCTAL          : in std_logic;
       o_SPI_SS_FLASH_n     : out std_logic;
       o_SPI_SS_SD1_n       : out std_logic;
       o_SPI_SS_SD0_n       : out std_logic;
 
       o_SPI_SCK            : out std_logic;
-      o_SPI_MOSI           : out std_logic;
+      o_SPI_MOSI           : out std_logic_vector(7 downto 0);
       
-      i_SPI_SD_MISO        : in std_logic;
+      i_SPI_SD_MISO        : in std_logic_vector(7 downto 0);
       i_SPI_FLASH_MISO     : in std_logic;
       
       -- UART
@@ -745,8 +746,8 @@ architecture rtl of zxnext is
    signal spi_ss_sd1_n           : std_logic;
    signal spi_ss_sd0_n           : std_logic;
    signal spi_sck                : std_logic;
-   signal spi_mosi               : std_logic;
-   signal spi_miso               : std_logic;
+   signal spi_mosi               : std_logic_vector(7 downto 0);
+   signal spi_miso               : std_logic_vector(7 downto 0);
    signal spi_wait_n             : std_logic;
    signal port_eb_dat            : std_logic_vector(7 downto 0);
    signal port_e7_reg            : std_logic_vector(7 downto 0) := X"FF";
@@ -2156,7 +2157,7 @@ begin
    pi_spi0_miso <= i_GPIO(9) when pi_spi0_en = '1' else '1';
    
    gpio_10_en <= '1' when pi_spi0_en = '1' else pi_gpio_en(10);
-   gpio_10 <= spi_mosi when pi_spi0_en = '1' else pi_gpio_o(10);
+   gpio_10 <= spi_mosi(0) when pi_spi0_en = '1' else pi_gpio_o(10);
    
    gpio_11_en <= '1' when pi_spi0_en = '1' else pi_gpio_en(11);
    gpio_11 <= spi_sck when pi_spi0_en = '1' else pi_gpio_o(11);
@@ -3102,15 +3103,16 @@ begin
    
    -- note: do not AND together miso sources
    
-   spi_miso <= i_SPI_FLASH_MISO when spi_ss_flash_n = '0' else
-               pi_spi0_miso     when spi_ss_rpi1_n = '0' or spi_ss_rpi0_n = '0' else
-               i_SPI_SD_MISO    when spi_ss_sd1_n = '0' or spi_ss_sd0_n = '0' else '1';
+   spi_miso <= "1111111" & i_SPI_FLASH_MISO when spi_ss_flash_n = '0' else
+               "1111111" & pi_spi0_miso     when spi_ss_rpi1_n = '0' or spi_ss_rpi0_n = '0' else
+                           i_SPI_SD_MISO    when spi_ss_sd1_n = '0' or spi_ss_sd0_n = '0' else (others => '1');
    
    spi_master_mod: entity work.spi_master
    port map (
       clock_i        => i_CLK_CPU,
       reset_i        => '0',           -- hard_reset done through core load
       
+      spi_octal_i    => i_SPI_OCTAL,
       spi_sck_o      => spi_sck,
       spi_mosi_o     => spi_mosi,
       spi_miso_i     => spi_miso,

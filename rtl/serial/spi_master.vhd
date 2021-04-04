@@ -45,17 +45,19 @@ entity spi_master is
    port (
       clock_i        : in std_logic;
       reset_i        : in std_logic;
-      
+
+      spi_octal_i    : in std_logic;
+
       spi_sck_o      : out std_logic;
-      spi_mosi_o     : out std_logic;
-      spi_miso_i     : in std_logic;
-      
+      spi_mosi_o     : out std_logic_vector(7 downto 0);
+      spi_miso_i     : in  std_logic_vector(7 downto 0);
+
       spi_mosi_wr_i  : in std_logic;
       spi_mosi_dat_i : in std_logic_vector(7 downto 0);
-      
+
       spi_miso_rd_i  : in std_logic;
       spi_miso_dat_o : out std_logic_vector(7 downto 0);
-      
+
       spi_wait_n_o   : out std_logic   -- wait signal for dma
    );
 end entity;
@@ -68,15 +70,14 @@ architecture rtl of spi_master is
    signal sck              : std_logic := '0';
    signal shift            : std_logic_vector(8 downto 0) := (others => '1');
    signal miso_dat         : std_logic_vector(7 downto 0);
+   signal old_stb          : std_logic;
 
 begin
 
    -- start condition
-   
-   spi_begin <= '1' when (spi_miso_rd_i = '1' or spi_mosi_wr_i = '1') and counter_is_zero = '1' else '0';
+   spi_begin <= '1' when (spi_miso_rd_i = '1' or spi_mosi_wr_i = '1') and counter_is_zero = '1' and spi_octal_i = '0' else '0';
    
    -- spi bit counter
-   
    counter_is_zero <= '1' when counter = X"0" else '0';
    
    process (clock_i)
@@ -95,6 +96,9 @@ begin
       if falling_edge(clock_i) then
          if reset_i = '1' then
             sck <= '0';
+			elsif spi_octal_i = '1' then
+				old_stb <= spi_miso_rd_i or spi_mosi_wr_i;
+				sck <= not old_stb and (spi_miso_rd_i or spi_mosi_wr_i);
          else
             sck <= counter(0);
          end if;
@@ -116,7 +120,7 @@ begin
             end if;
          elsif counter_is_zero = '0' then
             if sck = '0' then
-               shift(0) <= spi_miso_i;
+               shift(0) <= spi_miso_i(0);
             else
                shift <= shift(7 downto 0) & '1';
             end if;
@@ -137,10 +141,9 @@ begin
    
    -- connect pins
    
-   spi_sck_o <= sck;
-   spi_mosi_o <= shift(8);
-   spi_miso_dat_o <= miso_dat;
-   
-   spi_wait_n_o <= '1' when counter_is_zero = '1' else '0';
+   spi_sck_o      <= sck;
+   spi_mosi_o     <= "1111111" & shift(8) when spi_octal_i = '0' else spi_mosi_dat_i when spi_mosi_wr_i = '1' else (others => '1');
+   spi_miso_dat_o <= miso_dat             when spi_octal_i = '0' else spi_miso_i;
+   spi_wait_n_o   <= counter_is_zero      or   spi_octal_i;
 
 end architecture;
