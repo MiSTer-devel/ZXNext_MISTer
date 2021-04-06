@@ -38,8 +38,10 @@ entity zxnext_top is
 		CLK_28            : in  std_logic;
 		CLK_14            : in  std_logic;
 		CLK_7             : in  std_logic;
-
+		
 		HW_RESET          : in  std_logic;
+
+		CPU_SPEED         : out std_logic_vector(1 downto 0);
 
 		RAM_A_ADDR        : out std_logic_vector(20 downto 0);   -- 2MB memory space
 		RAM_A_REQ         : out std_logic;                       -- '1' indicates memory request on next rising edge
@@ -220,6 +222,8 @@ begin
    -- CLOCKS --------------------------------------------------
    ------------------------------------------------------------
    
+	CPU_SPEED <= zxn_cpu_speed;
+
    -- cpu clock selection
 	process (CLK_28)
 	begin
@@ -246,7 +250,7 @@ begin
 			end if;
 		end if;
 	end process;
-
+	
    process(q1, CLK_i0)
    begin
        if (q1 = '1') then

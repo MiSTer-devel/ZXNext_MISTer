@@ -210,13 +210,17 @@ localparam CONF_STR = {
 	"h2d1OST,Vertical Crop,No,270,216;",
 	"OQR,Scale,Normal,V-Integer,Narrower HV-Integer,Wider HV-Integer;",
 	"-;",
-	"O34,Stereo mix,none,25%,50%,100%;",
+	"O34,Stereo Mix,none,25%,50%,100%;",
 	"-;",
 	"O2,Joysticks Swap,No,Yes;",
 	"-;",
+	"h3-,Current CPU Clock:   3.5MHz;",
+	"h4-,Current CPU clock:     7MHz;",
+	"h5-,Current CPU clock:    14MHz;",
+	"h6-,Current CPU clock:    28MHz;",
 	"R0,Reset;",
 	"J,A,B,C,X,Y,Z,Start;",
-	"V,v",`BUILD_DATE 
+ 	"V,v",`BUILD_DATE
 };
 
 wire clk_sys, CLK_14, CLK_7, CLK_56, CLK_112;
@@ -270,7 +274,7 @@ hps_io #(.STRLEN($size(CONF_STR)>>3), .WIDE(1)) hps_io
 
 	.buttons(buttons),
 	.status(status),
-	.status_menumask({en1080p,|vcrop,1'b0}),
+	.status_menumask({cpu_speed==3,cpu_speed==2,cpu_speed==1,cpu_speed==0,en1080p,|vcrop,1'b0}),
 
 	.sd_lba(sd_lba),
 	.sd_rd(sd_rd),
@@ -303,6 +307,7 @@ wire  [7:0] RAM_B_DO;
 sdram sdram(.*, .clk(CLK_112), .init(~pll_locked));
 
 wire [11:0] aud_l, aud_r;
+wire  [1:0] cpu_speed;
 
 // active high =  X Z Y START A C B U D L R
 wire [10:0] j0 = {joy_0[7],joy_0[9],joy_0[8],joy_0[10],joy_0[4],joy_0[6],joy_0[5],joy_0[3:0]};
@@ -315,6 +320,8 @@ zxnext_top zxnext_top
 	.CLK_7         (CLK_7),
 
 	.HW_RESET      (reset),
+	
+	.CPU_SPEED     (cpu_speed),
 	
 	.RAM_A_ADDR    (RAM_A_ADDR),
 	.RAM_A_REQ     (RAM_A_REQ),
