@@ -450,7 +450,7 @@ video_freak video_freak
 );
 
 
-localparam VSD_OCTAL = 1;
+localparam VSD_OCTAL = 0;
 
 wire       sdclk;
 wire       sdoctal = vsd_sel && VSD_OCTAL;
