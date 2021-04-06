@@ -5,11 +5,9 @@ Port of original [ZX Spectrum Next core](https://gitlab.com/SpectrumNext/ZX_Spec
 ## MiSTer specifics
 - Uses SDRAM instead of SRAM. Some wait states are added in 14MHz and 28MHz modes.
 - Bootstrap option to load other cores is not supported (obviously).
-- Video modes for VGA and HDMI aren't supported (MiSTer uses its own HDMI settings).
+- Uses MiSTer's HDMI settings.
 - Added standard wide screen video crop and HV-Integer scaling for HDMI.
-
-Note: in latest version of Next sources hardreset has beed removed. So to get into
-boot configuration you have to re-load the core.
+- Re-added hard reset (unofficial).
 
 
 ## Installation
@@ -23,20 +21,11 @@ You may use secondary SD card (on I/O board) directly in this core. Make sure yo
 If core cannot find these files, then secondary SD card will be used instead.
 
 
-## Reset
-For unknown reason Next developers decided to remove hard reset logic from the core, so it's impossible to initiate a full hard reset now.
-It means you can choose the other emulated hardware only when core is reloaded. It also means if new vhd image contains significantly different ROM files
-than boot image, then it may have issues. So you have to reload the core in order to use other vhd image correctly.
-It's not a MiSTer issue.
-
-**Hint:** press space when you see a boot screen (you will be transferred to system selector), then open OSD and choose another vhd image and then choose reset 
-(or enable "Reset after Mount" option to automatically reset the core).
-
-
 ## Hotkeys
+* F1 - hard reset
 * F3 - toggle 50Hz/60Hz modes
-* F4 - reset
-* F8 - change CPU speed: 3.5MHz, 7MHz, 14MHz, 28MHz
+* F4 - soft reset
+* F8 - change CPU clock: 3.5MHz, 7MHz, 14MHz, 28MHz
 * F9 - NMI/Multiface
 * F10 - DivMMC NMI
 

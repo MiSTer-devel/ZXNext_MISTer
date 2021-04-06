@@ -40,6 +40,7 @@ entity zxnext_top is
 		CLK_7             : in  std_logic;
 		
 		HW_RESET          : in  std_logic;
+		SW_RESET          : in  std_logic;
 
 		CPU_SPEED         : out std_logic_vector(1 downto 0);
 
@@ -206,7 +207,7 @@ begin
    process (CLK_28)
    begin
       if rising_edge(CLK_28) then
-         if zxn_video_mode /= actual_video_mode or (zxn_reset_soft or zxn_reset_hard or HW_RESET) = '1' then
+         if zxn_video_mode /= actual_video_mode or (zxn_reset_soft or zxn_reset_hard or SW_RESET) = '1' then
             actual_video_mode <= zxn_video_mode;
             reset_counter <= (others => '1');
 				reset <= '1';
@@ -387,7 +388,7 @@ begin
    -- TBBLUE / ZXNEXT -----------------------------------------
    ------------------------------------------------------------
 
-   --  F1 = 
+   --  F1 = hard reset
    --  F2 = 
    --  F3 = toggle 50Hz / 60Hz display
    --  F4 = soft reset
@@ -423,13 +424,14 @@ begin
       -- RESET
 
       i_RESET              => reset,
+      i_BOOT               => ps2_kbd_fn(1) or HW_RESET,
       
       o_RESET_HARD         => zxn_reset_hard,
       o_RESET_SOFT         => zxn_reset_soft,
       
       -- SPECIAL KEYS
 
-      i_SPKEY_FUNCTION     => ps2_kbd_fn(10) & ps2_kbd_fn(9) & ps2_kbd_fn(8) & "000" & ps2_kbd_fn(4) & ps2_kbd_fn(3) & "00",
+      i_SPKEY_FUNCTION     => ps2_kbd_fn(10) & ps2_kbd_fn(9) & ps2_kbd_fn(8) & "000" & (ps2_kbd_fn(4) or ps2_kbd_fn(1) or HW_RESET) & ps2_kbd_fn(3) & "00",
       i_SPKEY_BUTTONS      => ps2_kbd_fn(10) & ps2_kbd_fn(9),
       
       -- MEMBRANE KEYBOARD

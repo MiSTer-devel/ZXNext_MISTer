@@ -194,15 +194,14 @@ assign VGA_F1 = 0;
 // 0         1         2         3          4         5         6
 // 01234567890123456789012345678901 23456789012345678901234567890123
 // 0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
-// XXXXXXXXX                 XXXX
+// XXXXXXXXXX                XXXX
 
 
 `include "build_id.v" 
 localparam CONF_STR = {
 	"ZXNext;;",
-	"-;",
-	"S,VHD;",
-	"O1,Reset after Mount,No,Yes;",
+	"S0,VHD;",
+	"O1,Hard Reset after mount,No,Yes;",
    "-;",
 	"O78,Aspect Ratio,Original,Full Screen,[ARC1],[ARC2];",
 	"O56,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%;",
@@ -218,7 +217,8 @@ localparam CONF_STR = {
 	"h4-,Current CPU clock:     7MHz;",
 	"h5-,Current CPU clock:    14MHz;",
 	"h6-,Current CPU clock:    28MHz;",
-	"R0,Reset;",
+	"R0,Soft Reset;",
+	"R9,Hard Reset;",
 	"J,A,B,C,X,Y,Z,Start;",
  	"V,v",`BUILD_DATE
 };
@@ -238,7 +238,7 @@ pll pll
 );
 
 reg reset = 0;
-always @(posedge clk_sys) reset <= RESET | status[0] | buttons[1] | (status[1] && img_mounted);
+always @(posedge clk_sys) reset <= RESET | status[0] | buttons[1];
 
 wire        forced_scandoubler;
 wire  [1:0] buttons;
@@ -319,8 +319,9 @@ zxnext_top zxnext_top
 	.CLK_14        (CLK_14),
 	.CLK_7         (CLK_7),
 
-	.HW_RESET      (reset),
-	
+	.SW_RESET      (reset),
+	.HW_RESET      (status[9] || (status[1] && img_mounted)),
+
 	.CPU_SPEED     (cpu_speed),
 	
 	.RAM_A_ADDR    (RAM_A_ADDR),

@@ -50,7 +50,7 @@ entity ps2_keyb is
       i_keymap_data     : in std_logic_vector(7 downto 0);
       i_keymap_we       : in std_logic;
 
-      fn                : out std_logic_vector(11 downto 1)
+      fn                : out std_logic_vector(11 downto 1) := (others => '0')
    );
 end entity;
 
@@ -103,9 +103,9 @@ begin
    process (i_CLK)
    begin
       if rising_edge(i_CLK) then
-         if i_reset = '1' or ps2_matrix_reset = '1' then
+         if ps2_matrix_reset = '1' then
 				fn <= (others => '0');
-         elsif ps2_key_valid = '1' and ps2_key_extend = '0' then
+         elsif ps2_valid = '1' and ps2_key_extend = '0' then
 				if ps2_receive_data = X"05" then    -- F1
 					fn(1) <= not ps2_key_release;
 				elsif ps2_receive_data = X"06" then -- F2

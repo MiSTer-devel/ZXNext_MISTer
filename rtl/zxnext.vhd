@@ -52,6 +52,7 @@ entity zxnext is
       -- RESET
 
       i_RESET              : in std_logic;      -- asserted for some number of cycles
+      i_BOOT               : in std_logic;
       
       o_RESET_SOFT         : out std_logic;     -- asserted for one cycle at 28MHz
       o_RESET_HARD         : out std_logic;     -- asserted for one cycle at 28MHz
@@ -2109,6 +2110,9 @@ begin
       if rising_edge(i_CLK_28) then
          if reset = '1' then
             nr_8c_altrom(7 downto 4) <= nr_8c_altrom(3 downto 0);
+            if i_BOOT = '1' then
+               nr_8c_altrom <= X"00";
+            end if;
          elsif nr_8c_we = '1' then
             nr_8c_altrom <= nr_wr_dat;
          end if;
@@ -3597,7 +3601,9 @@ begin
    process (i_CLK_28)
    begin
       if rising_edge(i_CLK_28) then
-         if nr_8f_we = '1' then
+         if reset = '1' and i_BOOT = '1' then
+				nr_8f_mapping_mode <= "00";
+         elsif nr_8f_we = '1' then
             nr_8f_mapping_mode <= nr_wr_dat(1 downto 0);
          end if;
       end if;
@@ -4819,11 +4825,66 @@ begin
             nr_cd_dma_int_en_1 <= (others => '0');
             nr_ce_dma_int_en_2_654 <= (others => '0');
             nr_ce_dma_int_en_2_210 <= (others => '0');
-            
+
+            if i_BOOT = '1' then
+               bootrom_en                  <= '1';
+               nr_03_config_mode           <= '1';
+               nr_02_bus_reset             <= '0';
+               nr_03_machine_timing        <= "000";
+               nr_03_user_dt_lock          <= '0';
+               nr_03_machine_type          <= "000";
+               nr_04_romram_bank           <= (others => '0');
+               nr_05_joy0                  <= "001";
+               nr_05_joy1                  <= "000";
+               nr_06_button_drive_nmi_en   <= '0';
+               nr_06_button_m1_nmi_en      <= '0';
+               nr_06_ps2_mode              <= '1';
+               nr_06_psg_mode              <= "00";
+               nr_06_internal_speaker_beep <= '0';
+               nr_08_contention_disable    <= '0';
+               nr_08_psg_stereo_mode       <= '0';
+               nr_08_internal_speaker_en   <= '1';
+               nr_08_dac_en                <= '0';
+               nr_08_port_ff_rd_en         <= '0';
+               nr_08_psg_turbosound_en     <= '0';
+               nr_08_keyboard_issue2       <= '0';
+               nr_09_psg_mono              <= (others => '0');
+               nr_09_hdmi_audio_disable    <= '0';
+               nr_0a_mf_type               <= "00";
+               nr_0a_divmmc_automap_en     <= '0';
+               nr_0a_mouse_button_reverse  <= '0';
+               nr_0a_mouse_dpi             <= "01";
+               nr_10_flashboot             <= '0';
+               nr_10_coreid                <= "00001";
+               nr_11_video_timing          <= "000";
+               nr_7f_user_register_0       <= X"FF";
+               nr_81_expbus_ula_override   <= '0';
+               nr_81_expbus_nmi_debounce_disable <= '0';
+               nr_81_expbus_clken          <= '0';
+               nr_81_expbus_speed          <= "00";
+               nr_82_internal_port_enable  <= (others => '1');
+               nr_83_internal_port_enable  <= (others => '1');
+               nr_84_internal_port_enable  <= (others => '1');
+               nr_85_internal_port_enable  <= (others => '1');
+               nr_85_internal_port_reset_type <= '1';
+               nr_86_bus_port_enable       <= (others => '1');
+               nr_87_bus_port_enable       <= (others => '1');
+               nr_88_bus_port_enable       <= (others => '1');
+               nr_89_bus_port_enable       <= (others => '1');
+               nr_89_bus_port_reset_type   <= '1';
+               nr_8a_bus_port_propagate    <= (others => '0');
+               nr_90_pi_gpio_o_en          <= (others => '0');
+               nr_91_pi_gpio_o_en          <= (others => '0');
+               nr_92_pi_gpio_o_en          <= (others => '0');
+               nr_93_pi_gpio_o_en          <= (others => '0');
+               nr_a8_esp_gpio0_en          <= '0';
+               nr_a9_esp_gpio0             <= '1';
+            end if;
+
             if nr_03_config_mode = '1' then
                bootrom_en <= '1';
             end if;
-
+				
          elsif nr_wr_en = '1' then
          
             case nr_wr_reg is
