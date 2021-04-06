@@ -70,6 +70,7 @@ architecture rtl of spi_master is
    signal sck              : std_logic := '0';
    signal shift            : std_logic_vector(8 downto 0) := (others => '1');
    signal miso_dat         : std_logic_vector(7 downto 0);
+   signal mosi_oct         : std_logic_vector(7 downto 0);
    signal old_stb          : std_logic;
 
 begin
@@ -99,6 +100,11 @@ begin
 			elsif spi_octal_i = '1' then
 				old_stb <= spi_miso_rd_i or spi_mosi_wr_i;
 				sck <= not old_stb and (spi_miso_rd_i or spi_mosi_wr_i);
+				if spi_mosi_wr_i = '1' then
+					mosi_oct <= spi_mosi_dat_i;
+				else
+					mosi_oct <= (others => '1');
+				end if;
          else
             sck <= counter(0);
          end if;
@@ -142,8 +148,8 @@ begin
    -- connect pins
    
    spi_sck_o      <= sck;
-   spi_mosi_o     <= "1111111" & shift(8) when spi_octal_i = '0' else spi_mosi_dat_i when spi_mosi_wr_i = '1' else (others => '1');
+   spi_mosi_o     <= "1111111" & shift(8) when spi_octal_i = '0' else mosi_oct;
    spi_miso_dat_o <= miso_dat             when spi_octal_i = '0' else spi_miso_i;
-   spi_wait_n_o   <= counter_is_zero      or   spi_octal_i;
+   spi_wait_n_o   <= counter_is_zero      when spi_octal_i = '0' else '1';
 
 end architecture;
