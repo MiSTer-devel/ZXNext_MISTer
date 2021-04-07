@@ -53,7 +53,7 @@ assign SDRAM_CKE = 1;
 assign {SDRAM_DQMH,SDRAM_DQML} = SDRAM_A[12:11];
 
 localparam RASCAS_DELAY   = 3'd2; // tRCD=20ns -> 2 cycles@85MHz
-localparam BURST_LENGTH   = 3'd0; // 0=1, 1=2, 2=4, 3=8, 7=full page
+localparam BURST_LENGTH   = 3'd1; // 0=1, 1=2, 2=4, 3=8, 7=full page
 localparam ACCESS_TYPE    = 1'd0; // 0=sequential, 1=interleaved
 localparam CAS_LATENCY    = 3'd2; // 2/3 allowed
 localparam OP_MODE        = 2'd0; // only 0 (standard operation) allowed
@@ -73,20 +73,21 @@ reg  [1:0] bank;
 reg [15:0] data;
 reg        we;
 reg        ram_req=0;
-reg [20:1] last_a[2] = '{'1,'1};
+reg [21:2] last_a[2] = '{'1,'1};
 reg  [8:0] rfsh_cnt;
 
-wire       fetch_req = (RAM_A_RD_n || last_a[0] != RAM_A_ADDR[20:1]);
+wire       fetch_req = (RAM_A_RD_n || last_a[0] != {1'b0,RAM_A_ADDR[20:2]});
 
 // access manager
 always @(posedge clk) begin
 	reg old_ref;
 	reg        old_b_req;
 	reg        old_a_req;
-	reg [15:0] last_data[2];
+	reg [31:0] last_data[2];
 	reg [15:0] data_reg;
 	reg        ch0_busy;
 	reg        ch1_busy;
+	reg  [2:0] store;
 
 	data_reg <= SDRAM_DQ;
 
@@ -95,25 +96,25 @@ always @(posedge clk) begin
 	old_a_req <= RAM_A_REQ;
 	if(~old_a_req & RAM_A_REQ) begin
 		if(rfsh_cnt[8] || fetch_req) RAM_A_WAIT <= 1;
-		else RAM_A_DO <= RAM_A_ADDR[0] ? last_data[0][15:8] : last_data[0][7:0];
+		else RAM_A_DO <= last_data[0][(RAM_A_ADDR[1:0]*8) +:8];
 	end
 
-	if((old_b_req ^ RAM_B_REQ) && (last_a[1] == RAM_B_ADDR[20:1])) begin
+	if((old_b_req ^ RAM_B_REQ) && (last_a[1] == {1'b0,RAM_B_ADDR[20:2]})) begin
 		old_b_req <= RAM_B_REQ;
-		RAM_B_DO <= RAM_B_ADDR[0] ? last_data[1][15:8] : last_data[1][7:0];
+		RAM_B_DO <= last_data[1][(RAM_B_ADDR[1:0]*8) +:8];
 	end
-
+	
 	if(state == STATE_IDLE && mode == MODE_NORMAL) begin
 		ram_req <= 0;
 		we <= 0;
 		ch0_busy <= 0;
 		ch1_busy <= 0;
 
-		if((old_b_req ^ RAM_B_REQ) && (last_a[1] != RAM_B_ADDR[20:1])) begin
+		if((old_b_req ^ RAM_B_REQ) && (last_a[1] != {1'b0,RAM_B_ADDR[20:2]})) begin
 			old_b_req <= RAM_B_REQ;
 			{bank,a} <= RAM_B_ADDR;
 			ram_req <= 1;
-			last_a[1] <= RAM_B_ADDR[20:1];
+			last_a[1] <= RAM_B_ADDR[20:2];
 			ch1_busy <= 1;
 			state <= STATE_START;
 		end
@@ -122,7 +123,7 @@ always @(posedge clk) begin
 			{bank,a} <= RAM_A_ADDR;
 			data <= {RAM_A_DI,RAM_A_DI};
 			ram_req <= fetch_req;
-			last_a[0] <= RAM_A_RD_n ? '1 : RAM_A_ADDR[20:1];
+			last_a[0] <= RAM_A_RD_n ? '1 : RAM_A_ADDR[20:2];
 			ch0_busy <= 1;
 			state <= STATE_START;
 		end
@@ -130,6 +131,11 @@ always @(posedge clk) begin
 			rfsh_cnt <= 0;
 			state <= STATE_START;
 		end
+	end
+
+	if(store) begin
+		last_data[store[1]][(store[0] ? 16 : 0) +:16] <= data_reg;
+		store <= 0;
 	end
 
 	if(state == STATE_READY) begin
@@ -141,15 +147,17 @@ always @(posedge clk) begin
 				if(we) RAM_A_DO <= data[7:0];
 				else begin
 					RAM_A_DO <= a[0] ? data_reg[15:8] : data_reg[7:0];
-					last_data[0] <= data_reg;
+					last_data[0][(a[1] ? 16 : 0) +:16] <= data_reg;
+					store <= {2'b10,~a[1]};
 				end
 			end
-			else RAM_A_DO <= a[0] ? last_data[0][15:8] : last_data[0][7:0];
+			else RAM_A_DO <= last_data[0][(a[1:0]*8) +:8];
 		end
 		if(ch1_busy) begin
 			ch1_busy <= 0;
 			RAM_B_DO <= a[0] ? data_reg[15:8] : data_reg[7:0];
-			last_data[1] <= data_reg;
+			last_data[1][(a[1] ? 16 : 0) +:16] <= data_reg;
+			store <= {2'b11,~a[1]};
 		end
 	end
 
@@ -213,8 +221,8 @@ always @(posedge clk) begin
 	endcase
 
 	casex({ram_req,mode,state})
-		{1'b1,  MODE_NORMAL, STATE_START}: SDRAM_A <= a[13:1];
-		{1'b1,  MODE_NORMAL, STATE_CONT }: SDRAM_A <= {we & ~a[0], we & a[0], 2'b10, a[22:14]};
+		{1'b1,  MODE_NORMAL, STATE_START}: SDRAM_A <= a[22:10];
+		{1'b1,  MODE_NORMAL, STATE_CONT }: SDRAM_A <= {we & ~a[0], we & a[0], 2'b10, a[9:1]};
 
 		// init
 		{1'bX,     MODE_LDM, STATE_START}: SDRAM_A <= MODE;
