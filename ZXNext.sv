@@ -180,7 +180,7 @@ assign AUDIO_MIX = status[4:3];
 
 assign LED_DISK = 0;
 assign LED_POWER = 0;
-assign LED_USER = sd_act & ~vsd_sel;
+assign LED_USER = sd_act;
 assign BUTTONS = 0;
 
 assign UART_RTS = 0;
@@ -200,8 +200,9 @@ assign VGA_F1 = 0;
 `include "build_id.v" 
 localparam CONF_STR = {
 	"ZXNext;;",
-	"S0,VHD;",
-	"O1,Hard Reset after mount,No,Yes;",
+	"S0,VHD,Mount C:;",
+	"S1,VHD,Mount D:;",
+	"O1,Hard Reset on C: mount,No,Yes;",
    "-;",
 	"O78,Aspect Ratio,Original,Full Screen,[ARC1],[ARC2];",
 	"O56,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%;",
@@ -210,7 +211,6 @@ localparam CONF_STR = {
 	"OQR,Scale,Normal,V-Integer,Narrower HV-Integer,Wider HV-Integer;",
 	"-;",
 	"O34,Stereo Mix,none,25%,50%,100%;",
-	"-;",
 	"O2,Joysticks Swap,No,Yes;",
 	"-;",
 	"h3-,Current CPU Clock:   3.5MHz;",
@@ -248,20 +248,20 @@ wire [24:0] ps2_mouse;
 wire  [7:0] ps2_mouse_ext;
 wire [15:0] joy_0, joy_1;
 
-wire [31:0] sd_lba;
-wire        sd_rd;
-wire        sd_wr;
-wire        sd_ack;
+wire [31:0] sd_lba = (sd_rd[0]|sd_wr[0]) ? sd0_lba : sd1_lba;
+wire  [1:0] sd_rd;
+wire  [1:0] sd_wr;
+wire  [1:0] sd_ack;
 wire  [7:0] sd_buff_addr;
 wire [15:0] sd_buff_dout;
-wire [15:0] sd_buff_din;
+wire [15:0] sd_buff_din = sd_ack[0] ? sd0_buff_din : sd1_buff_din;
 wire        sd_buff_wr;
-wire        img_mounted;
+wire  [1:0] img_mounted;
 wire [63:0] img_size;
 
 wire [21:0] gamma_bus;
 
-hps_io #(.STRLEN($size(CONF_STR)>>3), .WIDE(1)) hps_io
+hps_io #(.STRLEN($size(CONF_STR)>>3), .VDNUM(2), .WIDE(1)) hps_io
 (
 	.clk_sys(clk_sys),
 	.HPS_BUS(HPS_BUS),
@@ -338,11 +338,11 @@ zxnext_top zxnext_top
 	.ps2_mouse     (ps2_mouse),
 	.ps2_mouse_ext (ps2_mouse_ext),
 
-	.sd_cs0_n_o    (sdss),
+	.sd_cs0_n_o    (sdss0),
+	.sd_cs1_n_o    (sdss1),
 	.sd_sclk_o     (sdclk),
 	.sd_mosi_o     (sdmosi),
 	.sd_miso_i     (sdmiso),
-	.sd_octal_i    (sdoctal),
 
 	.audio_L       (aud_l),
 	.audio_R       (aud_r),
@@ -368,7 +368,7 @@ always @(posedge clk_sys) begin
 	reg [15:0] cnt = 0;
 	
 	if(cnt) cnt <= cnt - 1'd1;
-	if(status[9] || (status[1] && img_mounted)) cnt <= '1;
+	if(status[9] || (status[1] && img_mounted[0])) cnt <= '1;
 	
 	hw_reset <= |cnt;
 end
@@ -461,42 +461,82 @@ video_freak video_freak
 );
 
 
-localparam VSD_OCTAL = 0;
+wire sdclk;
+wire sdmosi;
+wire sdmiso = ~sdss1 ? vsdmiso1 : vsd_sel0 ? vsdmiso0 : SD_MISO;
 
-wire       sdclk;
-wire       sdoctal = vsd_sel && VSD_OCTAL;
-wire [7:0] sdmosi;
-wire [7:0] sdmiso = vsd_sel ? vsdmiso : {7'b1111111, SD_MISO};
-wire       sdss;
-
-reg vsd_sel = 0;
+reg vsd_sel0 = 0;
 always @(posedge clk_sys) begin
-	if(img_mounted) vsd_sel <= |img_size;
-	if(RESET) vsd_sel <= 0;
+	if(img_mounted[0]) vsd_sel0 <= |img_size;
+	if(RESET) vsd_sel0 <= 0;
 end
 
-wire [7:0] vsdmiso;
-sd_card #(.WIDE(1), .OCTAL(VSD_OCTAL)) sd_card
+wire        sdss0;
+wire        vsdmiso0;
+wire [31:0] sd0_lba;
+wire [15:0] sd0_buff_din;
+
+sd_card #(.WIDE(1)) sd_card_0
 (
 	.*,
+
+	.img_mounted(img_mounted[0]),
+
+	.sd_lba(sd0_lba),
+	.sd_rd(sd_rd[0]),
+	.sd_wr(sd_wr[0]),
+	.sd_ack(sd_ack[0]),
+	.sd_buff_din(sd0_buff_din),
+
 	.clk_spi(clk_sys),
 	.sdhc(1),
 	.sck(sdclk),
-	.ss(sdss | ~vsd_sel),
+	.ss(sdss0 | ~vsd_sel0),
 	.mosi(sdmosi),
-	.miso(vsdmiso)
+	.miso(vsdmiso0)
 );
 
-assign SD_CS   = sdss      |  vsd_sel;
-assign SD_SCK  = sdclk     & ~vsd_sel;
-assign SD_MOSI = sdmosi[0] & ~vsd_sel;
+reg vsd_sel1 = 0;
+always @(posedge clk_sys) begin
+	if(img_mounted[1]) vsd_sel1 <= |img_size;
+	if(RESET) vsd_sel1 <= 0;
+end
+
+wire        sdss1;
+wire        vsdmiso1;
+wire [31:0] sd1_lba;
+wire [15:0] sd1_buff_din;
+
+sd_card #(.WIDE(1)) sd_card_1
+(
+	.*,
+
+	.img_mounted(img_mounted[1]),
+
+	.sd_lba(sd1_lba),
+	.sd_rd(sd_rd[1]),
+	.sd_wr(sd_wr[1]),
+	.sd_ack(sd_ack[1]),
+	.sd_buff_din(sd1_buff_din),
+
+	.clk_spi(clk_sys),
+	.sdhc(1),
+	.sck(sdclk),
+	.ss(sdss1 | ~vsd_sel1),
+	.mosi(sdmosi),
+	.miso(vsdmiso1)
+);
+
+assign SD_CS   = sdss0  |  vsd_sel0;
+assign SD_SCK  = sdclk  & ~vsd_sel0;
+assign SD_MOSI = sdmosi |  vsd_sel0;
 
 reg sd_act;
 always @(posedge clk_sys) begin
 	reg old_clk;
 	integer timeout = 0;
 
-	old_clk <= sdclk;
+	old_clk <= SD_SCK;
 
 	sd_act <= 0;
 	if(timeout < 1000000) begin
@@ -504,7 +544,7 @@ always @(posedge clk_sys) begin
 		sd_act <= 1;
 	end
 
-	if(sdss & (old_clk ^ sdclk)) timeout <= 0;
+	if(~SD_CS & (old_clk ^ SD_SCK)) timeout <= 0;
 end
 
 wire tape_in;
