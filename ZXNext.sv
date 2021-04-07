@@ -238,7 +238,7 @@ pll pll
 );
 
 reg reset = 0;
-always @(posedge clk_sys) reset <= RESET | status[0] | buttons[1];
+always @(posedge clk_sys) reset <= RESET | status[0] | buttons[1] | hw_reset;
 
 wire        forced_scandoubler;
 wire  [1:0] buttons;
@@ -320,7 +320,7 @@ zxnext_top zxnext_top
 	.CLK_7         (CLK_7),
 
 	.SW_RESET      (reset),
-	.HW_RESET      (status[9] || (status[1] && img_mounted)),
+	.HW_RESET      (hw_reset),
 
 	.CPU_SPEED     (cpu_speed),
 	
@@ -362,6 +362,16 @@ zxnext_top zxnext_top
 	.RGB_HB_n      (HBlank_n),
 	.RGB_NTSC      (ntsc)
 );
+
+reg hw_reset = 0;
+always @(posedge clk_sys) begin
+	reg [15:0] cnt = 0;
+	
+	if(cnt) cnt <= cnt - 1'd1;
+	if(status[9] || (status[1] && img_mounted)) cnt <= '1;
+	
+	hw_reset <= |cnt;
+end
 
 assign AUDIO_L = {aud_l, 4'b0000};
 assign AUDIO_R = {aud_r, 4'b0000};
