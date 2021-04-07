@@ -43,13 +43,13 @@ entity zxnext_top is
 		SW_RESET          : in  std_logic;
 
 		CPU_SPEED         : out std_logic_vector(1 downto 0);
+		CPU_WAIT          : in  std_logic := '0';
 
 		RAM_A_ADDR        : out std_logic_vector(20 downto 0);   -- 2MB memory space
 		RAM_A_REQ         : out std_logic;                       -- '1' indicates memory request on next rising edge
 		RAM_A_RD_n        : out std_logic;                       -- '0' for read, '1' for write
 		RAM_A_DI          : in  std_logic_vector(7 downto 0);     -- data read from memory
 		RAM_A_DO          : out std_logic_vector(7 downto 0);    -- data written to memory
-		RAM_A_WAIT        : in  std_logic := '0';
 
 		RAM_B_ADDR        : out std_logic_vector(20 downto 0);   -- 2MB memory space
 		RAM_B_REQ         : out std_logic;                       -- toggle indicates memory request
@@ -419,6 +419,7 @@ begin
       o_CPU_SPEED          => zxn_cpu_speed,
       o_CPU_CONTEND        => zxn_clock_contend,
       o_CPU_CLK_LSB        => zxn_clock_lsb,
+      i_CPU_WAIT           => CPU_WAIT,
       
       -- RESET
 
@@ -510,7 +511,6 @@ begin
 		o_RAM_A_RD_n         => RAM_A_RD_n,
 		i_RAM_A_DI           => RAM_A_DI,
 		o_RAM_A_DO           => RAM_A_DO,
-		i_RAM_A_WAIT         => RAM_A_WAIT,
 		o_RAM_B_ADDR         => RAM_B_ADDR,
 		o_RAM_B_REQ_T        => RAM_B_REQ,
 		i_RAM_B_DI           => RAM_B_DI,

@@ -327,13 +327,13 @@ zxnext_top zxnext_top
 	.HW_RESET      (hw_reset),
 
 	.CPU_SPEED     (cpu_speed),
-	
+	.CPU_WAIT      (RAM_A_WAIT || sd_wait),
+
 	.RAM_A_ADDR    (RAM_A_ADDR),
 	.RAM_A_REQ     (RAM_A_REQ),
 	.RAM_A_RD_n    (RAM_A_RD_n),
 	.RAM_A_DO      (RAM_A_DI),
 	.RAM_A_DI      (RAM_A_DO),
-	.RAM_A_WAIT    (RAM_A_WAIT),
 	.RAM_B_ADDR    (RAM_B_ADDR),
 	.RAM_B_REQ     (RAM_B_REQ),
 	.RAM_B_DI      (RAM_B_DO),
@@ -534,6 +534,9 @@ sd_card #(.WIDE(1)) sd_card_1
 	.mosi(sdmosi),
 	.miso(vsdmiso1)
 );
+
+reg [1:0] sd_wait;
+always @(posedge clk_sys) sd_wait <= (sd_wait & sd_ack) | sd_wr;
 
 assign SD_CS   = sdss0  |  vsd_sel0;
 assign SD_SCK  = sdclk  & ~vsd_sel0;

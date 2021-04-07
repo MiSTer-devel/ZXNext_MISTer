@@ -175,7 +175,8 @@ entity zxnext is
       o_RAM_A_RD_n         : out std_logic;                       -- '0' for read, '1' for write
       i_RAM_A_DI           : in std_logic_vector(7 downto 0);     -- data read from memory
       o_RAM_A_DO           : out std_logic_vector(7 downto 0);    -- data written to memory
-      i_RAM_A_WAIT         : in std_logic := '0';
+
+      i_CPU_WAIT           : in std_logic := '0';
       
       -- Port B is read only (LAYER 2)
       
@@ -1706,7 +1707,7 @@ begin
 
    expbus_disable_int <= '1' when expbus_eff_en = '0' or expbus_eff_disable_io = '1' or im2_ieo = '0' or nr_c4_int_en_0_expbus = '0' else '0';
 
-   z80_wait_n <= '0' when (ula_wait_n = '0') or (ulap_wait_n = '0') or (sram_wait_n = '0') or (i_BUS_WAIT_n = '0' and expbus_eff_en = '1') or (i_RAM_A_WAIT = '1') else '1';
+   z80_wait_n <= '0' when (ula_wait_n = '0') or (ulap_wait_n = '0') or (sram_wait_n = '0') or (i_BUS_WAIT_n = '0' and expbus_eff_en = '1') or (i_CPU_WAIT = '1') else '1';
    z80_int_n <= (pulse_int_n or not expbus_disable_int) and im2_int_n and (i_BUS_INT_n or expbus_disable_int);
    z80_nmi_n <= nmi_generate_n;
    z80_busrq_n <= dma_busrq_n;
