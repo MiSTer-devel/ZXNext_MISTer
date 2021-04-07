@@ -41,6 +41,7 @@ set_global_assignment -name VHDL_FILE rtl/device/ctc.vhd
 set_global_assignment -name VHDL_FILE rtl/zxnext.vhd
 set_global_assignment -name VHDL_FILE rtl/mister/ps2_keyb.vhd
 set_global_assignment -name VHDL_FILE rtl/mister/bram.vhd
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/mister/rtc.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mister/sdram.sv
 set_global_assignment -name VHDL_FILE rtl/mister/zxnext_top.vhd
 set_global_assignment -name SYSTEMVERILOG_FILE ZXNext.sv

@@ -261,6 +261,8 @@ wire [63:0] img_size;
 
 wire [21:0] gamma_bus;
 
+wire [64:0] RTC;
+
 hps_io #(.STRLEN($size(CONF_STR)>>3), .VDNUM(2), .WIDE(1)) hps_io
 (
 	.clk_sys(clk_sys),
@@ -290,6 +292,8 @@ hps_io #(.STRLEN($size(CONF_STR)>>3), .VDNUM(2), .WIDE(1)) hps_io
 	.ps2_key(ps2_key),
 	.ps2_mouse(ps2_mouse),
 	.ps2_mouse_ext(ps2_mouse_ext),
+
+	.RTC(RTC),
 
 	.gamma_bus(gamma_bus)
 );
@@ -354,6 +358,10 @@ zxnext_top zxnext_top
 
 	.uart_rx_i     (UART_RXD),
 	.uart_tx_o     (UART_TXD),
+
+	.i2c_scl_o     (i2c_scl_o),
+	.i2c_sda_o     (i2c_sda_o),
+	.i2c_sda_i     (i2c_sda_i),
 
 	.RGB           ({rgb_r,rgb_g,rgb_b}),
 	.RGB_VS_n      (VSync_n),
@@ -546,6 +554,21 @@ always @(posedge clk_sys) begin
 
 	if(~SD_CS & (old_clk ^ SD_SCK)) timeout <= 0;
 end
+
+wire i2c_scl_o;
+wire i2c_sda_o;
+wire i2c_sda_i;
+
+rtc #(28000000) rtc
+(
+	.clk(clk_sys),
+	.reset(reset),
+	.RTC(RTC),
+	.scl_i(i2c_scl_o),
+	.sda_i(i2c_sda_o),
+	.sda_o(i2c_sda_i)
+);
+
 
 wire tape_in;
 wire tape_adc, tape_adc_act;
