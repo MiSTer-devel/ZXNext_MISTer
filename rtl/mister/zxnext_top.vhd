@@ -64,9 +64,8 @@ entity zxnext_top is
 		sd_cs0_n_o        : out std_logic;
 		sd_cs1_n_o        : out std_logic;
 		sd_sclk_o         : out std_logic;
-		sd_mosi_o         : out std_logic_vector(7 downto 0);
-		sd_miso_i         : in  std_logic_vector(7 downto 0) := (others => '1');
-		sd_octal_i        : in  std_logic := '0';
+		sd_mosi_o         : out std_logic;
+		sd_miso_i         : in  std_logic := '1';
 
 		-- Joystick
 		joy_left          : in  std_logic_vector(10 downto 0); -- active high  X Z Y START A C B U D L R
@@ -479,7 +478,6 @@ begin
       o_SPI_MOSI           => sd_mosi_o,
       i_SPI_SD_MISO        => sd_miso_i,
       i_SPI_FLASH_MISO     => '1',
-      i_SPI_OCTAL          => sd_octal_i,
       
       -- UART
       
