@@ -1,3 +1,4 @@
+set_global_assignment -name QIP_FILE rtl/mister/MiSTer.qip
 set_global_assignment -name VHDL_FILE rtl/audio/ym2149.vhd
 set_global_assignment -name VHDL_FILE rtl/audio/turbosound.vhd
 set_global_assignment -name VHDL_FILE rtl/audio/soundrive.vhd
@@ -39,10 +40,5 @@ set_global_assignment -name VHDL_FILE rtl/rom/bootrom.vhd
 set_global_assignment -name VHDL_FILE rtl/device/ctc_chan.vhd
 set_global_assignment -name VHDL_FILE rtl/device/ctc.vhd
 set_global_assignment -name VHDL_FILE rtl/zxnext.vhd
-set_global_assignment -name VHDL_FILE rtl/mister/ps2_keyb.vhd
-set_global_assignment -name VHDL_FILE rtl/mister/bram.vhd
-set_global_assignment -name SYSTEMVERILOG_FILE rtl/mister/rtc.sv
-set_global_assignment -name SYSTEMVERILOG_FILE rtl/mister/sdram.sv
-set_global_assignment -name VHDL_FILE rtl/mister/zxnext_top.vhd
 set_global_assignment -name SYSTEMVERILOG_FILE ZXNext.sv
 set_global_assignment -name SDC_FILE ZXNext.sdc

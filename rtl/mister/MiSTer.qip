@@ -1,0 +1,7 @@
+set_global_assignment -name VHDL_FILE          [file join $::quartus(qip_path) ps2_keyb.vhd ]
+set_global_assignment -name VHDL_FILE          [file join $::quartus(qip_path) bram.vhd ]
+set_global_assignment -name VHDL_FILE          [file join $::quartus(qip_path) tzxplayer.vhd ]
+set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) rtc.sv ]
+set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) ddram.sv ]
+set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) sdram.sv ]
+set_global_assignment -name VHDL_FILE          [file join $::quartus(qip_path) zxnext_top.vhd ]

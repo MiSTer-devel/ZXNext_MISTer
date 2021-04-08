@@ -222,7 +222,7 @@ begin
    -- CLOCKS --------------------------------------------------
    ------------------------------------------------------------
    
-	CPU_SPEED <= zxn_cpu_speed;
+	CPU_SPEED <= zxn_cpu_speed2;
 
    -- cpu clock selection
 	process (CLK_28)
@@ -245,8 +245,8 @@ begin
 					CLK_i0 <= clk_28_div(0);
 			end case;
 			
-			if clk_28_div(1 downto 0) = "11" and zxn_cpu_speed /= "11" then
-				zxn_cpu_speed2  <= zxn_cpu_speed;
+			if clk_28_div(1 downto 0) = "11" then
+				zxn_cpu_speed2 <= zxn_cpu_speed;
 			end if;
 		end if;
 	end process;

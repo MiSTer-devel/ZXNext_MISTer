@@ -173,14 +173,13 @@ module emu
 );
 
 assign USER_OUT = '1;
-assign {DDRAM_CLK, DDRAM_BURSTCNT, DDRAM_ADDR, DDRAM_DIN, DDRAM_BE, DDRAM_RD, DDRAM_WE} = '0;  
 
 assign AUDIO_S = 0;  // 1 - signed audio samples, 0 - unsigned
 assign AUDIO_MIX = status[4:3];
 
 assign LED_DISK = 0;
 assign LED_POWER = 0;
-assign LED_USER = sd_act;
+assign LED_USER = sd_act | tape_led;
 assign BUTTONS = 0;
 
 assign UART_RTS = 0;
@@ -203,6 +202,8 @@ localparam CONF_STR = {
 	"S0,VHD,Mount C:;",
 	"S1,VHD,Mount D:;",
 	"O1,Hard Reset on C: mount,No,Yes;",
+   "-;",
+	"F1,TZX,Load Tape;",
    "-;",
 	"O78,Aspect Ratio,Original,Full Screen,[ARC1],[ARC2];",
 	"O56,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%;",
@@ -263,6 +264,13 @@ wire [21:0] gamma_bus;
 
 wire [64:0] RTC;
 
+wire        ioctl_wr;
+wire [24:0] ioctl_addr;
+wire [15:0] ioctl_dout;
+wire        ioctl_download;
+wire  [7:0] ioctl_index;
+wire        ioctl_wait;
+
 hps_io #(.STRLEN($size(CONF_STR)>>3), .VDNUM(2), .WIDE(1)) hps_io
 (
 	.clk_sys(clk_sys),
@@ -288,6 +296,13 @@ hps_io #(.STRLEN($size(CONF_STR)>>3), .VDNUM(2), .WIDE(1)) hps_io
 	.sd_buff_wr(sd_buff_wr),
 	.img_mounted(img_mounted),
 	.img_size(img_size),
+
+	.ioctl_wr(ioctl_wr),
+	.ioctl_addr(ioctl_addr),
+	.ioctl_dout(ioctl_dout),
+	.ioctl_download(ioctl_download),
+	.ioctl_index(ioctl_index),
+	.ioctl_wait(ioctl_wait),
 
 	.ps2_key(ps2_key),
 	.ps2_mouse(ps2_mouse),
@@ -576,7 +591,7 @@ rtc #(28000000) rtc
 wire tape_in;
 wire tape_adc, tape_adc_act;
 
-assign tape_in = tape_adc_act & tape_adc;
+assign tape_in = tape_adc_act ? tape_adc : audio_out;
 
 ltc2308_tape #(.CLK_RATE(28000000)) ltc2308_tape
 (
@@ -585,5 +600,125 @@ ltc2308_tape #(.CLK_RATE(28000000)) ltc2308_tape
   .dout(tape_adc),
   .active(tape_adc_act)
 );
+
+/////////////////////////////////////////////////////////////////////
+
+assign DDRAM_CLK = CLK_112;
+wire clk_tape = CLK_112;
+
+reg tape_ce;
+always @(posedge clk_tape) begin
+	reg [4:0] div;
+	reg [1:0] speed;
+	
+	div <= div + 1'd1;
+	if(&div) speed <= cpu_speed;
+	case(speed)
+		0: tape_ce <= !div[4:0];
+		1: tape_ce <= !div[3:0];
+		2: tape_ce <= !div[2:0] & ~RAM_A_WAIT;
+		3: tape_ce <= !div[1:0] & ~RAM_A_WAIT;
+	endcase
+end
+
+ddram ddram
+(
+	.*,
+
+	.wraddr(ioctl_addr[24:1]),
+	.din(ioctl_dout),
+	.we_req(ddram_we_req),
+	.we_ack(ddram_we_ack),
+
+	.rdaddr(tape_addr),
+	.dout(tape_data),
+	.rom_req(tape_req),
+	.rom_ack(tape_ack)
+);
+
+reg  ddram_we_req;
+wire ddram_we_ack;
+always @(posedge clk_sys) if(ioctl_wr) ddram_we_req <= ~ddram_we_req;
+
+assign ioctl_wait = ddram_we_req ^ ddram_we_ack;
+wire   tape_download = ioctl_download && (ioctl_index == 1);
+
+wire tzx_stop, tzx_stop48k, tzx_loop_start, tzx_loop_next, tzx_audio, tzx_req;
+
+tzxplayer #(.TZX_MS(3500)) tzxplayer
+(
+	.clk(clk_tape),
+	.ce(tape_ce),
+	.tzx_req(tzx_req),
+	.tzx_ack(tape_ack),
+	.loop_start(tzx_loop_start),
+	.loop_next(tzx_loop_next),
+	.stop(tzx_stop),
+	.stop48k(tzx_stop48k),
+	.restart_tape(~tape_ready | tape_restart),
+	.host_tap_in(tape_data),
+	.cass_read(tzx_audio),
+	.cass_motor(!play_pause)
+);
+
+wire [7:0] tape_data;
+reg        tape_req;
+wire       tape_ack;
+
+reg        key_restart, tape_restart, play_pause;
+reg        audio_out;
+reg [24:0] tape_addr;
+reg        tape_ready;
+always @(posedge clk_tape) begin
+	reg        old_download;
+	reg [24:0] tape_len, tzx_loop_addr;
+	reg        key_stb1, key_stb2;
+	reg [24:0] addr;
+	
+	tape_restart <= tape_download;
+
+	key_stb1 <= ps2_key[10];
+	key_stb2 <= key_stb1;
+	if(key_stb1 ^ key_stb2) begin
+		if(ps2_key[8:0] == 'h03 && ps2_key[9]) play_pause   <= ~play_pause; // F5
+		if(ps2_key[8:0] == 'h0B)               tape_restart <= 1;           // F6
+		if(ps2_key[8:0] == 'h83)               tape_ready   <= 0;           // F7
+	end
+
+	if(reset) tape_ready <= 0;
+	if(!tape_ready) play_pause <= 1;
+
+	tape_req <= tzx_req;
+	if(tape_restart) begin
+		addr <= 0;
+		tape_addr  <= 0;
+		play_pause <= 1;
+	end
+	else if(tape_req ^ tzx_req) begin
+		tape_addr <= addr;
+		addr <= addr + 1'd1;
+		if(addr >= tape_len) tape_ready <= 0;
+	end
+	
+	audio_out <= tzx_audio;
+	if(tzx_stop | tzx_stop48k) play_pause <= 1;
+	if(tzx_loop_start) tzx_loop_addr <= addr;
+	if(tzx_loop_next) begin
+		addr      <= tzx_loop_addr + 1'd1;
+		tape_addr <= tzx_loop_addr;
+	end
+	
+	old_download <= tape_download;
+	if(old_download & ~tape_download) begin
+		tape_len <= ioctl_addr;
+		tape_ready <= 1;
+		play_pause <= 0;
+	end
+end
+
+wire tape_led = act_cnt[22] ? act_cnt[21:14] > act_cnt[7:0] : act_cnt[21:14] <= act_cnt[7:0];
+
+reg [22:0] act_cnt;
+always @(posedge clk_sys) if(~play_pause || ~(tape_ready ^ act_cnt[22]) || act_cnt[21:0]) act_cnt <= act_cnt + 1'd1;
 
 endmodule
