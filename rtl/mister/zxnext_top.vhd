@@ -43,6 +43,7 @@ entity zxnext_top is
 		SW_RESET          : in  std_logic;
 
 		CPU_SPEED         : out std_logic_vector(1 downto 0);
+		CPU_SPEED_SW      : in  std_logic := '0';
 		CPU_WAIT          : in  std_logic := '0';
 
 		RAM_A_ADDR        : out std_logic_vector(20 downto 0);   -- 2MB memory space
@@ -431,7 +432,7 @@ begin
       
       -- SPECIAL KEYS
 
-      i_SPKEY_FUNCTION     => ps2_kbd_fn(10) & ps2_kbd_fn(9) & ps2_kbd_fn(8) & "000" & (ps2_kbd_fn(4) or ps2_kbd_fn(1) or HW_RESET) & ps2_kbd_fn(3) & "00",
+      i_SPKEY_FUNCTION     => ps2_kbd_fn(10) & ps2_kbd_fn(9) & (ps2_kbd_fn(8) or CPU_SPEED_SW) & "000" & (ps2_kbd_fn(4) or ps2_kbd_fn(1) or HW_RESET) & ps2_kbd_fn(3) & "00",
       i_SPKEY_BUTTONS      => ps2_kbd_fn(10) & ps2_kbd_fn(9),
       
       -- MEMBRANE KEYBOARD

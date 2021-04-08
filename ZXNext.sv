@@ -193,7 +193,7 @@ assign VGA_F1 = 0;
 // 0         1         2         3          4         5         6
 // 01234567890123456789012345678901 23456789012345678901234567890123
 // 0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
-// XXXXXXXXXX                XXXX
+// XXXXXXXXXXX               XXXX
 
 
 `include "build_id.v" 
@@ -210,14 +210,13 @@ localparam CONF_STR = {
 	"H2d1OS,Vertical Crop,No,Yes;",
 	"h2d1OST,Vertical Crop,No,270,216;",
 	"OQR,Scale,Normal,V-Integer,Narrower HV-Integer,Wider HV-Integer;",
-	"-;",
 	"O34,Stereo Mix,none,25%,50%,100%;",
 	"O2,Joysticks Swap,No,Yes;",
 	"-;",
-	"h3-,Current CPU Clock:   3.5MHz;",
-	"h4-,Current CPU clock:     7MHz;",
-	"h5-,Current CPU clock:    14MHz;",
-	"h6-,Current CPU clock:    28MHz;",
+	"h3TA,CPU Clock:           3.5MHz;",
+	"h4TA,CPU Clock:             7MHz;",
+	"h5TA,CPU Clock:            14MHz;",
+	"h6TA,CPU Clock:            28MHz;",
 	"R0,Soft Reset;",
 	"R9,Hard Reset;",
 	"J,A,B,C,X,Y,Z,Start;",
@@ -341,6 +340,7 @@ zxnext_top zxnext_top
 	.SW_RESET      (reset),
 	.HW_RESET      (hw_reset),
 
+	.CPU_SPEED_SW  (status[10]),
 	.CPU_SPEED     (cpu_speed),
 	.CPU_WAIT      (RAM_A_WAIT || sd_wait),
 
