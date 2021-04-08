@@ -342,7 +342,7 @@ zxnext_top zxnext_top
 
 	.CPU_SPEED_SW  (status[10]),
 	.CPU_SPEED     (cpu_speed),
-	.CPU_WAIT      (RAM_A_WAIT || sd_wait),
+	.CPU_WAIT      (RAM_A_WAIT | spi_wait),
 
 	.RAM_A_ADDR    (RAM_A_ADDR),
 	.RAM_A_REQ     (RAM_A_REQ),
@@ -550,8 +550,14 @@ sd_card #(.WIDE(1)) sd_card_1
 	.miso(vsdmiso1)
 );
 
-reg [1:0] sd_wait;
-always @(posedge clk_sys) sd_wait <= (sd_wait & sd_ack) | sd_wr;
+reg spi_wait;
+always @(posedge clk_sys) begin
+	reg [1:0] sd_wait;
+
+	sd_wait <= (sd_wait & sd_ack) | sd_wr;
+	if(sdclk && sd_wait) spi_wait <= 1; // extend existing spi wait by sd wait
+	if(!sd_wait) spi_wait <= 0;
+end
 
 assign SD_CS   = sdss0  |  vsd_sel0;
 assign SD_SCK  = sdclk  & ~vsd_sel0;
