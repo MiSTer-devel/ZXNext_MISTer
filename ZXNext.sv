@@ -203,7 +203,7 @@ localparam CONF_STR = {
 	"S1,VHD,Mount D:;",
 	"O1,Hard Reset on C: mount,No,Yes;",
    "-;",
-	"F1,TZX,Load Tape;",
+	"F1,TZX,Load Tape,30000000;",
    "-;",
 	"O78,Aspect Ratio,Original,Full Screen,[ARC1],[ARC2];",
 	"O56,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%;",
@@ -631,6 +631,8 @@ ddram ddram
 (
 	.*,
 
+	.reset(tape_restart),
+
 	.wraddr(ioctl_addr[24:1]),
 	.din(ioctl_dout),
 	.we_req(ddram_we_req),
@@ -647,7 +649,7 @@ wire ddram_we_ack;
 always @(posedge clk_sys) if(ioctl_wr) ddram_we_req <= ~ddram_we_req;
 
 assign ioctl_wait = ddram_we_req ^ ddram_we_ack;
-wire   tape_download = ioctl_download && (ioctl_index == 1);
+wire   tape_download = ioctl_download && (ioctl_index[4:0] == 1);
 
 wire tzx_stop, tzx_stop48k, tzx_loop_start, tzx_loop_next, tzx_audio, tzx_req;
 

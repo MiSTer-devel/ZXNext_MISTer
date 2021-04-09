@@ -35,6 +35,8 @@ module ddram
 	output  [7:0] DDRAM_BE,
 	output        DDRAM_WE,
 
+	input         reset,
+
 	input  [27:1] wraddr,
 	input  [15:0] din,
 	input         we_req,
@@ -65,7 +67,7 @@ reg  [7:0] ram_be = 0;
 
 always @(posedge DDRAM_CLK) begin
 	reg [1:0]  state  = 0;
-	
+
 	if(rom_req != rom_ack && state != 1 && cache_addr == rdaddr[27:3]) rom_ack <= rom_req;
 
 	if(!DDRAM_BUSY) begin
@@ -113,6 +115,11 @@ always @(posedge DDRAM_CLK) begin
 					state   <= 0;
 				end
 		endcase
+	end
+	
+	if(reset) begin
+		cache_addr    <= '1;
+		cache_addr[3] <= 0;
 	end
 end
 
