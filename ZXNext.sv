@@ -203,7 +203,7 @@ localparam CONF_STR = {
 	"S1,VHD,Mount D:;",
 	"O1,Hard Reset on C: mount,No,Yes;",
    "-;",
-	"F1,TZX,Load Tape,30000000;",
+	"F1,TZXCSW,Load Tape,30000000;",
    "-;",
 	"O78,Aspect Ratio,Original,Full Screen,[ARC1],[ARC2];",
 	"O56,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%;",

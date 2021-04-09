@@ -87,7 +87,12 @@ type tzx_state_t is (
 	TZX_PLAY_TAPBLOCK4,
 	TZX_DIRECT,
 	TZX_DIRECT2,
-	TZX_DIRECT3);
+	TZX_DIRECT3,
+	CSW_DATA0,
+	CSW_DATA1,
+	CSW_DATA2,
+	CSW_DATA3,
+	CSW_DATA4);
 
 signal tzx_state: tzx_state_t;
 
@@ -109,10 +114,19 @@ signal motor_counter  : std_logic_vector(21 downto 0);
 signal loop_iter      : std_logic_vector(15 downto 0);
 signal data_len_dword : std_logic_vector(31 downto 0);
 
+signal csw_sig        : std_logic_vector(3 downto 0);
+signal csw_freq       : std_logic_vector(31 downto 0);
+signal csw_pulse_len  : std_logic_vector(31 downto 0);
+signal csw_tmp        : std_logic_vector(23 downto 0);
+signal csw_ver        : std_logic_vector(7 downto 0);
+
+constant CSW_CLOCK    : std_logic_vector(31 downto 0) := std_logic_vector(to_unsigned(TZX_MS * 1000, 32));
+
 begin
 
 tap_fifo_do <= host_tap_in;
 process(clk)
+	variable csw_fcnt : std_logic_vector(31 downto 0);
 begin
   if rising_edge(clk) then
 	if restart_tape = '1' then
@@ -127,7 +141,10 @@ begin
 		loop_start <= '0';
 		loop_next <= '0';
 		loop_iter <= (others => '0');
-
+		csw_sig <= (others => '0');
+		csw_pulse_len <= (others => '0');
+		cass_read <= '1';
+		csw_fcnt := (others => '0');
 	else
 
 		-- simulate tape motor momentum
@@ -167,12 +184,26 @@ begin
 			wave_cnt <= (others => '0');
 		end if;
 
+		if csw_pulse_len /= 0 then
+			if ce = '1' then
+				csw_fcnt := csw_fcnt + csw_freq;
+				if csw_fcnt >= CSW_CLOCK then
+					csw_fcnt := csw_fcnt - CSW_CLOCK;
+					csw_pulse_len <= csw_pulse_len - 1;
+					if csw_pulse_len = 1 then
+						cass_read <= wave_period;
+						wave_period <= not wave_period;
+					end if;
+				end if;
+			end if;
+		end if;
+
 		loop_start <= '0';
 		loop_next  <= '0';
 		stop       <= '0';
 		stop48k    <= '0';
 
-		if playing = '1' and pulse_len = 0 and tzx_req = tzx_ack then
+		if playing = '1' and pulse_len = 0 and csw_pulse_len = 0 and tzx_req = tzx_ack then
 
 			tzx_req <= not tzx_ack; -- default request for new data
 
@@ -180,9 +211,25 @@ begin
 			when TZX_HEADER =>
 				cass_read <= '1';
 				tzx_offset <= tzx_offset + 1;
-				if tzx_offset = x"0A" then -- skip 9 bytes, offset lags 1
-					tzx_state <= TZX_NEWBLOCK;
-				end if;
+				case tzx_offset is
+					when x"01" => if tap_fifo_do = X"43" then csw_sig <= csw_sig + 1;    end if;
+					when x"02" => if tap_fifo_do = X"6F" then csw_sig <= csw_sig + 1;    end if;
+					when x"03" => if tap_fifo_do = X"6D" then csw_sig <= csw_sig + 1;    end if;
+					when x"04" => if tap_fifo_do = X"70" then csw_sig <= csw_sig + 1;    end if;
+					when x"05" => if tap_fifo_do = X"72" then csw_sig <= csw_sig + 1;    end if;
+					when x"06" => if tap_fifo_do = X"65" then csw_sig <= csw_sig + 1;    end if;
+					when x"07" => if tap_fifo_do = X"73" then csw_sig <= csw_sig + 1;    end if;
+					when x"08" => if tap_fifo_do = X"73" then csw_sig <= csw_sig + 1;    end if;
+					when x"0A" => if csw_sig /= x"8"     then tzx_state <= TZX_NEWBLOCK; end if; -- skip 9 bytes, offset lags 1
+					when x"18" => csw_ver <= tap_fifo_do;
+					when x"1A" =>                     csw_freq(7 downto 0)   <= tap_fifo_do;
+					when x"1B" =>                     csw_freq(15 downto 8)  <= tap_fifo_do;
+					when x"1C" => if csw_ver = 2 then csw_freq(23 downto 16) <= tap_fifo_do; else csw_freq(23 downto 16) <= x"00"; end if;
+					when x"1D" => if csw_ver = 2 then csw_freq(31 downto 24) <= tap_fifo_do; else csw_freq(31 downto 24) <= x"00"; end if;
+					when x"20" => if csw_ver = 1         then tzx_state <= CSW_DATA0;    end if;
+					when x"34" =>                             tzx_state <= CSW_DATA0;
+					when others => null;
+				end case;
 
 			when TZX_NEWBLOCK =>
 				tzx_offset <= (others=>'0');
@@ -515,6 +562,29 @@ begin
 				else
 					tzx_state <= TZX_DIRECT2;
 				end if;
+
+			when CSW_DATA0 =>
+				if tap_fifo_do /= x"00" then
+					csw_pulse_len <= x"000000" & tap_fifo_do;
+				else
+					tzx_state <= CSW_DATA1;
+				end if;
+
+			when CSW_DATA1 =>
+				csw_tmp(7 downto 0) <= tap_fifo_do;
+				tzx_state <= CSW_DATA2;
+
+			when CSW_DATA2 =>
+				csw_tmp(15 downto 8) <= tap_fifo_do;
+				tzx_state <= CSW_DATA3;
+
+			when CSW_DATA3 =>
+				csw_tmp(23 downto 16) <= tap_fifo_do;
+				tzx_state <= CSW_DATA4;
+
+			when CSW_DATA4 =>
+				csw_pulse_len <= tap_fifo_do & csw_tmp;
+				tzx_state <= CSW_DATA0;
 
 			when others => null;
 			end case;
