@@ -8,6 +8,7 @@ Port of original [ZX Spectrum Next core](https://gitlab.com/SpectrumNext/ZX_Spec
 - Uses MiSTer's HDMI settings.
 - Added standard wide screen video crop and HV-Integer scaling for HDMI.
 - Re-added hard reset (unofficial).
+- Support TZX and CSW(non-compressed) tape formats.
 
 
 ## Installation
@@ -25,6 +26,9 @@ If core cannot find these files, then secondary SD card will be used instead.
 * F1 - hard reset
 * F3 - toggle 50Hz/60Hz modes
 * F4 - soft reset
+* F5 - tape play/pause
+* F6 - tape restart
+* F7 - tape finish
 * F8 - change CPU clock: 3.5MHz, 7MHz, 14MHz, 28MHz
 * F9 - NMI/Multiface
 * F10 - DivMMC NMI
