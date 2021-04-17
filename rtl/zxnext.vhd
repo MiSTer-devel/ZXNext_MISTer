@@ -463,6 +463,7 @@ architecture rtl of zxnext is
    signal dac_hw_en              : std_logic;
    
    signal bus_iorq_ula           : std_logic := '0';
+   signal bus_iorq_ula_q         : std_logic;
 
    signal port_00xx_msb          : std_logic;
    signal port_04xx_msb          : std_logic;
@@ -476,16 +477,16 @@ architecture rtl of zxnext is
    signal port_30xx_msb          : std_logic;
    signal port_3dxx_msb          : std_logic;
    signal port_bfxx_msb          : std_logic;
-   signal port_fexx_msb          : std_logic;
+   --signal port_fexx_msb          : std_logic;
    signal port_ffxx_msb          : std_logic;
 
-   signal port_00_lsb            : std_logic;
-   signal port_08_lsb            : std_logic;
+   --signal port_00_lsb            : std_logic;
+   --signal port_08_lsb            : std_logic;
    signal port_0b_lsb            : std_logic;
    signal port_0f_lsb            : std_logic;
    signal port_1f_lsb            : std_logic;
    signal port_37_lsb            : std_logic;
-   signal port_38_lsb            : std_logic;
+   --signal port_38_lsb            : std_logic;
    signal port_3f_lsb            : std_logic;
    signal port_3b_lsb            : std_logic;
    signal port_4f_lsb            : std_logic;
@@ -518,11 +519,14 @@ architecture rtl of zxnext is
 -- signal port_p3_float_active   : std_logic;
    signal port_7ffd              : std_logic;
    signal port_7ffd_active       : std_logic;
-   signal port_7ffd_assert       : std_logic;
+-- signal port_7ffd_assert       : std_logic;
    signal port_dffd              : std_logic;
+   signal port_xffd              : std_logic;
    signal port_1ffd              : std_logic;
+   signal port_2ffd              : std_logic;
+   signal port_3ffd              : std_logic;
 -- signal port_1ffd_active       : std_logic;
-   signal port_1ffd_assert       : std_logic;
+-- signal port_1ffd_assert       : std_logic;
    signal port_eff7              : std_logic;
    signal port_e3                : std_logic;
    signal port_mf_enable_io_a    : std_logic_vector(7 downto 0);
@@ -573,6 +577,9 @@ architecture rtl of zxnext is
    signal port_7ffd_wr           : std_logic;
    signal port_dffd_wr           : std_logic;
    signal port_1ffd_wr           : std_logic;
+   signal port_2ffd_rd           : std_logic;
+   signal port_3ffd_rd           : std_logic;
+   signal port_3ffd_wr           : std_logic;
    signal port_eff7_wr           : std_logic;
    signal port_e3_rd             : std_logic;
    signal port_e3_wr             : std_logic;
@@ -690,6 +697,7 @@ architecture rtl of zxnext is
    signal sram_rom3              : std_logic;
    signal sram_alt_128_n         : std_logic;
    
+   signal sram_pre_romcs_n       : std_logic;
    signal sram_pre_romcs_replace : std_logic;
    signal sram_pre_alt_en        : std_logic;
    signal sram_pre_alt_128_n     : std_logic;
@@ -714,12 +722,17 @@ architecture rtl of zxnext is
    signal sram_bank7             : std_logic;
    signal sram_rdonly            : std_logic;
    signal sram_romcs_en          : std_logic;
+   signal sram_mem_hide_n        : std_logic;
    
    signal sram_divmmc_automap_en             : std_logic;
    signal sram_divmmc_automap_rom3_en        : std_logic;
    
    signal sram_memcycle          : std_logic;
    signal sram_romcs             : std_logic;
+   
+   signal memcycle_complete      : std_logic;
+   signal memcycle_count         : std_logic_vector(2 downto 0);
+   signal memcycle_count_max     : std_logic_vector(2 downto 0);
 
    signal cpu_bank5_rd           : std_logic;
    signal cpu_bank5_we           : std_logic;
@@ -759,9 +772,9 @@ architecture rtl of zxnext is
    
    signal uart_do                : std_logic_vector(7 downto 0);
    
-   signal uart0_hwflow_en        : std_logic;
+   --signal uart0_hwflow_en        : std_logic;
    signal uart0_rx               : std_logic;
-   signal uart0_rx_rtr_n           : std_logic;
+   --signal uart0_rx_rtr_n           : std_logic;
    signal uart0_rx_avail         : std_logic;
    signal uart0_rx_near_full     : std_logic;
    signal uart0_tx               : std_logic;
@@ -835,7 +848,7 @@ architecture rtl of zxnext is
    signal port_dffd_reg_6        : std_logic;
    
    signal port_1ffd_reg          : std_logic_vector(7 downto 0);
-   signal port_1ffd_dat          : std_logic_vector(7 downto 0);
+   --signal port_1ffd_dat          : std_logic_vector(7 downto 0);
    signal port_1ffd_special      : std_logic;
    signal port_1ffd_special_old  : std_logic;
    signal port_1ffd_rom          : std_logic_vector(1 downto 0);
@@ -852,6 +865,10 @@ architecture rtl of zxnext is
    signal port_memory_change_dly : std_logic := '0';
    signal port_memory_ram_change_dly         : std_logic := '0';
    signal nr_8f_we_dly           : std_logic := '0';
+   
+   signal nr_02_io_trap          : std_logic_vector(1 downto 0);
+   signal nr_02_generate_io_trap_nmi         : std_logic;
+   signal nr_d9_io_trap_write    : std_logic_vector(7 downto 0);
    
    signal port_123b_dat          : std_logic_vector(7 downto 0) := (others => '0');
    signal port_123b_layer2_en    : std_logic;
@@ -1029,6 +1046,7 @@ architecture rtl of zxnext is
    signal nr_c8_we               : std_logic;
    signal nr_c9_we               : std_logic;
    signal nr_ca_we               : std_logic;
+   signal nr_d9_we               : std_logic;
    signal nr_ff_we               : std_logic;
    
    signal nr_02_bus_reset        : std_logic := '0';
@@ -1195,9 +1213,10 @@ architecture rtl of zxnext is
    signal nr_cd_dma_int_en_1     : std_logic_vector(7 downto 0);
    signal nr_ce_dma_int_en_2_654 : std_logic_vector(2 downto 0);
    signal nr_ce_dma_int_en_2_210 : std_logic_vector(2 downto 0);
+   signal nr_d8_io_trap_fdc_en   : std_logic;
 
    signal machine_type_48        : std_logic;
-   signal machine_type_128       : std_logic;
+   --signal machine_type_128       : std_logic;
    signal machine_type_p3        : std_logic;
    
    signal machine_timing_48      : std_logic;
@@ -1716,7 +1735,7 @@ begin
 
    process (z80_stackless_nmi, dma_holds_bus, z80_retn_address, cpu_mreq_n, cpu_rfsh_n, cpu_a, bootrom_en, bootrom_do, im2_ieo,
       sram_romcs_en, sram_pre_romcs_replace, i_BUS_DI, sram_bank5, cpu_bank5_do, sram_bank7, cpu_bank7_do, i_RAM_A_DI, cpu_m1_n,
-      cpu_iorq_n, port_internal_rd_response, bus_iorq_ula, port_rd_dat, im2_vector, expbus_eff_en, expbus_eff_disable_io)
+      cpu_iorq_n, port_internal_rd_response, bus_iorq_ula, port_rd_dat, im2_vector, expbus_eff_en, expbus_eff_disable_io, i_BUS_BUSREQ_n)
    begin
       if z80_stackless_nmi = '1' and dma_holds_bus = '0' then
       
@@ -2075,7 +2094,7 @@ begin
    --
    
    -- filter io cycles
-   -- external devices should see port fe, memory paging
+   -- external devices should optionally see port fe, memory paging
 
    port_propagate_fe <= port_fe and nr_8a_bus_port_propagate(0);
    port_propagate_7ffd <= port_7ffd and nr_8a_bus_port_propagate(1);
@@ -2084,10 +2103,21 @@ begin
    port_propagate_ff <= port_ff and nr_8a_bus_port_propagate(4);
    port_propagate_eff7 <= port_eff7 and nr_8a_bus_port_propagate(5);
 
-   port_propagate <= port_propagate_fe or port_propagate_7ffd or port_propagate_dffd or port_propagate_1ffd or port_propagate_ff or port_propagate_eff7;
+   port_propagate <= port_propagate_fe or bus_iorq_ula_q or port_propagate_7ffd or port_propagate_dffd or port_propagate_1ffd or port_propagate_ff or port_propagate_eff7;
    
    bus_iorq_n <= cpu_iorq_n or (cpu_m1_n and ((port_internal_response or expbus_eff_disable_io) and not port_propagate));
-   bus_mreq_n <= cpu_mreq_n or (cpu_rfsh_n and (expbus_eff_disable_mem or ((not cpu_a(15)) and (not cpu_a(14)) and not sram_pre_override(0))));  -- layer 2 / divmmc cannot be hidden
+   bus_mreq_n <= cpu_mreq_n or (cpu_rfsh_n and (expbus_eff_disable_mem or ((not cpu_a(15)) and (not cpu_a(14)) and not sram_mem_hide_n)));
+
+   bus_iorq_ula <= expbus_eff_en and i_BUS_IORQULA_n and port_fe and cpu_m1_n and not expbus_eff_disable_io;
+   
+   process (i_CLK_28)
+   begin
+      if rising_edge(i_CLK_28) then
+         if cpu_iorq_n = '1' then
+            bus_iorq_ula_q <= bus_iorq_ula;   -- if iorqula is high from port address then show the port fe io cycle (prevent oscillations on if1 iorq)
+         end if;
+      end if;
+   end process;
 
 -- o_BUS_ADDR <= cpu_a;
 -- o_BUS_DO <= cpu_do;
@@ -2245,8 +2275,6 @@ begin
    -- PORT DECODING -------------------------------------------
    ------------------------------------------------------------
 
-   -- todo: investigate switching to pentagon method where decoding depends on instruction type "IN A,(n)" vs "IN r,(C)"
-
    --
    -- active port enables (changed during iowr to port 253b or nextreg instruction)
    --
@@ -2325,8 +2353,6 @@ begin
       end if;
    end process;
 
-   bus_iorq_ula <= expbus_eff_en and i_BUS_IORQULA_n and port_fe and cpu_m1_n and not expbus_eff_disable_io;
-
    --
    -- early decode of port addresses to allow filtering of io cycles to expansion bus
    --
@@ -2346,7 +2372,7 @@ begin
       port_30xx_msb <= '0';
       port_3dxx_msb <= '0';
       port_bfxx_msb <= '0';
-      port_fexx_msb <= '0';
+      --port_fexx_msb <= '0';
       port_ffxx_msb <= '0';
       
       case cpu_a(15 downto 8) is
@@ -2363,7 +2389,7 @@ begin
          when X"30"  => port_30xx_msb <= '1';
          when X"3D"  => port_3dxx_msb <= '1';
          when X"BF"  => port_bfxx_msb <= '1';
-         when X"FE"  => port_fexx_msb <= '1';
+         --when X"FE"  => port_fexx_msb <= '1';
          when X"FF"  => port_ffxx_msb <= '1';
          when others => null;
       
@@ -2374,13 +2400,13 @@ begin
    process (cpu_a(7 downto 0))
    begin
    
-      port_00_lsb <= '0';
-      port_08_lsb <= '0';
+      --port_00_lsb <= '0';
+      --port_08_lsb <= '0';
       port_0b_lsb <= '0';
       port_0f_lsb <= '0';
       port_1f_lsb <= '0';
       port_37_lsb <= '0';
-      port_38_lsb <= '0';
+      --port_38_lsb <= '0';
       port_3f_lsb <= '0';
       port_3b_lsb <= '0';
       port_4f_lsb <= '0';
@@ -2407,13 +2433,13 @@ begin
    
       case cpu_a(7 downto 0) is
    
-         when X"00"  => port_00_lsb <= '1';
-         when X"08"  => port_08_lsb <= '1';
+         --when X"00"  => port_00_lsb <= '1';
+         --when X"08"  => port_08_lsb <= '1';
          when X"0B"  => port_0b_lsb <= '1';
          when X"0F"  => port_0f_lsb <= '1';
          when X"1F"  => port_1f_lsb <= '1';
          when X"37"  => port_37_lsb <= '1';
-         when X"38"  => port_38_lsb <= '1';
+         --when X"38"  => port_38_lsb <= '1';
          when X"3F"  => port_3f_lsb <= '1';
          when X"4F"  => port_4f_lsb <= '1';
          when X"57"  => port_57_lsb <= '1';
@@ -2454,21 +2480,20 @@ begin
    
    -- +3 floating bus
    
--- port_p3_float_active <= '1' when cpu_a(15 downto 12) = "0000" and port_fd = '1' and p3_timing_hw_en = '1' else '0';
--- port_p3_float <= '1' when port_p3_float_active = '1' and port_p3_floating_bus_io_en = '1' else '0';
    port_p3_float <= '1' when cpu_a(15 downto 12) = "0000" and port_fd = '1' and p3_timing_hw_en = '1' and port_p3_floating_bus_io_en = '1' else '0';
    
    -- original spectrum banking
 
-   port_7ffd_assert <= '1' when cpu_a(15) = '0' and (cpu_a(14) = '1' or p3_timing_hw_en = '0') and port_fd = '1' and port_1ffd = '0' else '0';
-   port_7ffd_active <= '1' when port_7ffd_assert = '1' and (s128_timing_hw_en = '1' or p3_timing_hw_en = '1') else '0';
-   port_7ffd <= '1' when port_7ffd_assert = '1' and port_7ffd_io_en = '1' else '0';
+   port_7ffd <= '1' when cpu_a(15) = '0' and (cpu_a(14) = '1' or p3_timing_hw_en = '0') and port_fd = '1' and port_1ffd = '0' and port_7ffd_io_en = '1' else '0';
+   port_7ffd_active <= '1' when port_7ffd = '1' and (s128_timing_hw_en = '1' or p3_timing_hw_en = '1') else '0';
    
    port_dffd <= '1' when cpu_a(15 downto 12) = "1101" and port_fd = '1' and port_dffd_io_en = '1' else '0';
 
-   port_1ffd_assert <= '1' when cpu_a(15 downto 12) = "0001" and port_fd = '1' else '0';
--- port_1ffd_active <= '1' when port_1ffd_assert = '1' and p3_timing_hw_en = '1' else '0';
-   port_1ffd <= '1' when port_1ffd_assert = '1' and port_1ffd_io_en = '1' else '0';
+   port_xffd <= '1' when cpu_a(15 downto 14) = "00" and port_fd = '1' else '0';
+   port_1ffd <= '1' when cpu_a(13 downto 12) = "01" and port_xffd = '1' and port_1ffd_io_en = '1' else '0';
+-- port_1ffd_active <= '1' when port_1ffd = '1' and p3_timing_hw_en = '1' else '0';
+   port_2ffd <= '1' when cpu_a(13 downto 12) = "10" and port_xffd = '1' and nr_d8_io_trap_fdc_en = '1' else '0';
+   port_3ffd <= '1' when cpu_a(13 downto 12) = "11" and port_xffd = '1' and nr_d8_io_trap_fdc_en = '1' else '0';
    
    port_eff7 <= '1' when cpu_a(15 downto 12) = "1110" and port_f7_lsb = '1' and port_eff7_io_en = '1' else '0';
    
@@ -2562,8 +2587,8 @@ begin
    
    -- check if xst handles this well
    
-   port_internal_response <= port_fe or port_ff or port_p3_float or port_7ffd or port_dffd or port_1ffd or port_eff7 or port_e3 or
-      port_mf_enable or port_mf_disable or port_e7 or port_eb or port_243b or port_253b or port_103b or port_113b or port_123b or port_uart or 
+   port_internal_response <= port_fe or port_ff or port_p3_float or port_7ffd or port_dffd or port_1ffd or port_2ffd or port_3ffd or port_eff7 or
+      port_e3 or port_mf_enable or port_mf_disable or port_e7 or port_eb or port_243b or port_253b or port_103b or port_113b or port_123b or port_uart or 
       port_dma or port_fffd or port_bffd or port_dac_A or port_dac_B or port_dac_C or port_dac_D or port_fadf or port_fbdf or port_ffdf or 
       port_1f or port_37 or port_57 or port_5b or port_303b or port_bf3b or port_ff3b or port_ctc;
    
@@ -2588,6 +2613,10 @@ begin
    port_dffd_wr <= iowr and port_dffd and not port_fd_conflict_wr;
    port_1ffd_wr <= iowr and port_1ffd and not port_fd_conflict_wr;
    port_eff7_wr <= iowr and port_eff7;
+   
+   port_2ffd_rd <= iord and port_2ffd;
+   port_3ffd_rd <= iord and port_3ffd;
+   port_3ffd_wr <= iowr and port_3ffd and not port_fd_conflict_wr;
    
    port_e3_rd <= iord and port_e3;
    port_e3_wr <= iowr and port_e3;
@@ -2861,9 +2890,6 @@ begin
 
    -- early decode sram address computation and freeze parameters
 
---   sram_pre_romcs_replace <= expbus_romcs_replace;
---   sram_pre_alt_en <= nr_8c_altrom_en;
-
    process (i_CLK_28)
    begin
       if falling_edge(i_CLK_28) then
@@ -2930,8 +2956,9 @@ begin
    
    sram_layer2_map_en <= sram_pre_override(1) and ((sram_pre_layer2_wr_en and cpu_rd_n) or (sram_pre_layer2_rd_en and not cpu_rd_n));
    sram_altrom_en <= '0' when (sram_pre_override(0) = '0') or (sram_pre_alt_en = '0') or (sram_pre_rdonly = '1' and cpu_rd_n = '1') or (sram_pre_rdonly = '0' and cpu_rd_n = '0') else '1';
+   sram_romcs <= sram_pre_override(0) and sram_pre_romcs_n;
    
-   process (sram_pre_override, divmmc_rom_en, divmmc_ram_en, divmmc_bank, divmmc_rdonly, sram_layer2_map_en, sram_pre_layer2_A21_A13, 
+   process (sram_pre_override, divmmc_rom_en, divmmc_ram_en, divmmc_bank, divmmc_rdonly, sram_layer2_map_en, sram_pre_layer2_A21_A13,
             sram_romcs, sram_pre_A20_A13, sram_altrom_en, sram_pre_alt_128_n, sram_pre_rdonly, sram_pre_active, sram_pre_bank5, sram_pre_bank7)
    begin
       if sram_pre_override(2) = '1' and divmmc_rom_en = '1' then
@@ -2941,6 +2968,7 @@ begin
          sram_bank7 <= '0';
          sram_rdonly <= '1';
          sram_romcs_en <= '0';
+         sram_mem_hide_n <= '0';
       elsif sram_pre_override(2) = '1' and divmmc_ram_en = '1' then
          sram_A20_A13 <= "0001" & divmmc_bank;
          sram_active <= '1';
@@ -2948,6 +2976,7 @@ begin
          sram_bank7 <= '0';
          sram_rdonly <= divmmc_rdonly;
          sram_romcs_en <= '0';
+         sram_mem_hide_n <= '0';
       elsif sram_layer2_map_en = '1' then
          sram_A20_A13 <= sram_pre_layer2_A21_A13(7 downto 0);
          sram_active <= not sram_pre_layer2_A21_A13(8);
@@ -2955,13 +2984,15 @@ begin
          sram_bank7 <= '0';
          sram_rdonly <= '0';
          sram_romcs_en <= '0';
+         sram_mem_hide_n <= '0';
       elsif sram_romcs = '1' then
          sram_A20_A13 <= "0001111" & sram_pre_A20_A13(0);    -- divmmc banks 14 and 15
          sram_active <= '1';
          sram_bank5 <= '0';
          sram_bank7 <= '0';
          sram_rdonly <= '1';
-         sram_romcs_en <= '1';
+         sram_romcs_en <= '1';   -- expbus romcs override
+         sram_mem_hide_n <= '1';
       elsif sram_altrom_en = '1' then
          sram_A20_A13 <= "000011" & sram_pre_alt_128_n & sram_pre_A20_A13(0);
          sram_active <= '1';
@@ -2969,6 +3000,7 @@ begin
          sram_bank7 <= '0';
          sram_rdonly <= sram_pre_rdonly;
          sram_romcs_en <= '0';
+         sram_mem_hide_n <= '1';
       else
          sram_A20_A13 <= sram_pre_A20_A13;
          sram_active <= sram_pre_active;
@@ -2976,26 +3008,64 @@ begin
          sram_bank7 <= sram_pre_bank7;
          sram_rdonly <= sram_pre_rdonly;
          sram_romcs_en <= '0';
+         sram_mem_hide_n <= sram_pre_override(0);
       end if;
    end process;
    
    -- divmmc automap disabled for most entry points if rom3 is not present
    
    sram_divmmc_automap_en <= sram_pre_override(2);
-   sram_divmmc_automap_rom3_en <= sram_pre_override(2) and sram_pre_override(0) and (not sram_layer2_map_en) and (not sram_romcs) and ((sram_altrom_en and sram_pre_alt_128_n) or (sram_pre_rom3 and not sram_altrom_en));
+   sram_divmmc_automap_rom3_en <= memcycle_complete and sram_pre_override(2) and sram_pre_override(0) and (not sram_layer2_map_en) and (not sram_romcs) and ((sram_altrom_en and sram_pre_alt_128_n) or (sram_pre_rom3 and not sram_altrom_en));
 
    --
    -- generate memory cycle
    --
    
-   sram_memcycle <= '1' when cpu_mreq_n = '0' and cpu_rfsh_n = '1' else '0';
+   sram_memcycle <= '1' when cpu_mreq_n = '0' and cpu_rfsh_n = '1' and memcycle_complete = '1' else '0';
    
    -- memory cycle may go to expansion bus if the lower 16K is accessed and romcs is active
    -- memory read of internal memory is harmless with cpu_di taken from internal memory or expansion bus depending on romcs at the end of the read cycle
    -- memory write is potentially harmful however a write cycle gives much more time for romcs to be asserted so is fine to act on when /wr goes low
 
-   sram_romcs <= sram_pre_override(0) and expbus_eff_en and i_BUS_ROMCS_n and not expbus_eff_disable_mem;
+   -- memory cycle is delayed to allow time for romcs from slow devices (divmmc)
 
+   memcycle_complete <= '1' when memcycle_count = memcycle_count_max else '0';
+   
+   process (i_CLK_28_n)
+   begin
+--    if falling_edge(i_CLK_28) then    -- xst bug: creates rising edge flip flop with clock passed through inverter which generates a synthesis error
+      if rising_edge(i_CLK_28_n) then   -- temporary fix but the builds aren't as good, see if it goes away later
+         if cpu_mreq_n = '1' then
+            memcycle_count <= (others => '0');
+         elsif memcycle_complete = '0' then
+            memcycle_count <= memcycle_count + 1;
+         end if;
+      end if;
+   end process;
+
+   process (cpu_speed)
+   begin
+      case cpu_speed is
+         when "00"   =>
+            memcycle_count_max <= "111";   -- before wr goes low
+         when "01"   =>
+            memcycle_count_max <= "011";
+         when "10" =>
+            memcycle_count_max <= "001";
+         when others =>
+            memcycle_count_max <= (others => '0');
+      end case;
+   end process;
+   
+   process (i_CLK_28)
+   begin
+      if falling_edge(i_CLK_28) then
+         if cpu_mreq_n = '1' or memcycle_complete = '0' then
+            sram_pre_romcs_n <= i_BUS_ROMCS_n and expbus_eff_en and not expbus_eff_disable_mem;
+         end if;
+      end if;
+   end process;
+   
    -- memory signals
    
    cpu_bank5_rd <= sram_memcycle and sram_bank5 and not cpu_rd_n;
@@ -3211,10 +3281,10 @@ begin
       
       -- uart 0 (esp)
       
-      o_uart0_hwflow       => uart0_hwflow_en,
+      --o_uart0_hwflow       => uart0_hwflow_en,
       
       i_Rx_0               => uart0_rx,
-      o_Rx_0_rtr_n         => uart0_rx_rtr_n,
+      --o_Rx_0_rtr_n         => uart0_rx_rtr_n,
       
       o_Rx_0_avail         => uart0_rx_avail,
       o_Rx_0_near_full     => uart0_rx_near_full,
@@ -3398,6 +3468,7 @@ begin
 
    -- FE, FF : ULA/SCLD
    -- 7FFD, DFFD, 1FFD : 128K MEMORY PAGING
+   -- I/O Traps
    -- 123B : LAYER 2 CONTROL
    -- COPPER
    -- CTC
@@ -3571,7 +3642,7 @@ begin
       end if;
    end process;
    
-   port_1ffd_dat <= port_1ffd_reg;
+   --port_1ffd_dat <= port_1ffd_reg;
 
    port_7ffd_bank(2 downto 0) <= port_7ffd_reg(2 downto 0);
    port_7ffd_bank(4 downto 3) <= port_7ffd_reg(7 downto 6) when nr_8f_mapping_mode_pentagon = '1' else port_dffd_reg(1 downto 0);
@@ -3632,6 +3703,40 @@ begin
       end if;
    end process;
    
+   --
+   -- I/O TRAPS
+   --
+
+   process (i_CLK_28)
+   begin
+      if rising_edge(i_CLK_28) then
+         if reset = '1' then
+            nr_02_io_trap <= (others => '0');
+         elsif (nr_02_we = '1' and nr_wr_dat(4) = '0') or nr_d8_io_trap_fdc_en = '0' then
+            nr_02_io_trap <= (others => '0');
+         elsif port_2ffd_rd = '1' then
+            nr_02_io_trap <= "01";
+         elsif port_3ffd_rd = '1' then
+            nr_02_io_trap <= "10";
+         elsif port_3ffd_wr = '1' then
+            nr_02_io_trap <= "11";
+         end if;
+      end if;
+   end process;
+   
+   nr_02_generate_io_trap_nmi <= nr_02_io_trap(1) or nr_02_io_trap(0);
+
+   process (i_CLK_28)
+   begin
+      if rising_edge(i_CLK_28) then
+         if nr_d9_we = '1' then
+            nr_d9_io_trap_write <= nr_wr_dat;
+         elsif port_3ffd_wr = '1' then
+            nr_d9_io_trap_write <= cpu_do;
+         end if;
+      end if;
+   end process;
+
    --
    -- PORT 123B LAYER 2 CONTROL
    --
@@ -4039,7 +4144,6 @@ begin
    
    mf_is_active <= mf_mem_en or mf_nmi_hold;
 
---   process (nr_0a_mf_type, cpu_a, port_1ffd_dat, port_7ffd_dat, port_dffd_reg_6, port_dffd_reg, port_eff7_reg_3, port_eff7_reg_2, port_fe_border)
    process (i_CLK_CPU)
    begin
       if falling_edge(i_CLK_CPU) then
@@ -4548,6 +4652,7 @@ begin
       nr_c8_we <= '0';
       nr_c9_we <= '0';
       nr_ca_we <= '0';
+      nr_d9_we <= '0';
       nr_ff_we <= '0';
 
       nr_sprite_mirror_we <= '0';
@@ -4621,6 +4726,7 @@ begin
             when X"C8" => nr_c8_we <= '1';
             when X"C9" => nr_c9_we <= '1';
             when X"CA" => nr_ca_we <= '1';
+            when X"D9" => nr_d9_we <= '1';
             when X"FF" => nr_ff_we <= '1';
             
             when others => null;
@@ -4824,6 +4930,8 @@ begin
             nr_cd_dma_int_en_1 <= (others => '0');
             nr_ce_dma_int_en_2_654 <= (others => '0');
             nr_ce_dma_int_en_2_210 <= (others => '0');
+            
+            nr_d8_io_trap_fdc_en <= '0';
 
             if i_BOOT = '1' then
                bootrom_en                  <= '1';
@@ -4879,11 +4987,11 @@ begin
                nr_a8_esp_gpio0_en          <= '0';
                nr_a9_esp_gpio0             <= '1';
             end if;
-
+            
             if nr_03_config_mode = '1' then
                bootrom_en <= '1';
             end if;
-				
+
          elsif nr_wr_en = '1' then
          
             case nr_wr_reg is
@@ -5403,6 +5511,12 @@ begin
                   nr_ce_dma_int_en_2_654 <= nr_wr_dat(6 downto 4);
                   nr_ce_dma_int_en_2_210 <= nr_wr_dat(2 downto 0);
                
+               when X"D8" =>
+                  nr_d8_io_trap_fdc_en <= nr_wr_dat(0);
+               
+--             when X"D9" =>
+--                nr_d9_we <= '1';
+               
 --             when X"FF" =>
 --                reserved for ula+
 
@@ -5416,20 +5530,20 @@ begin
       end if;
    end process;
 
-   -- Machine Type (port decoding, roms)
+   -- Machine Type (roms present)
 
    process (nr_03_machine_type)
    begin
    
       machine_type_48 <= '0';
-      machine_type_128 <= '0';
+      --machine_type_128 <= '0';
       machine_type_p3 <= '0';
       
       case nr_03_machine_type is
          when "000" | "001" =>
             machine_type_48 <= '1';
-         when "010" | "100" =>
-            machine_type_128 <= '1';
+         --when "010" | "100" =>
+         --   machine_type_128 <= '1';
          when others =>
             machine_type_p3 <= '1';
       end case;
@@ -5438,7 +5552,7 @@ begin
 
    -- Machine Timing (video frame, contention patterns)
    
-   process (nr_03_machine_timing)
+   process (eff_nr_03_machine_timing)
    begin
    
       machine_timing_48 <= '0';
@@ -5446,7 +5560,7 @@ begin
       machine_timing_p3 <= '0';
       machine_timing_pentagon <= '0';
       
-      case nr_03_machine_timing is
+      case eff_nr_03_machine_timing is
          when "000"  | "001" =>
             machine_timing_48 <= '1';
          when "010" =>
@@ -5567,7 +5681,7 @@ begin
                port_253b_dat <= std_logic_vector(g_version);
          
             when X"02" =>
-               port_253b_dat <= nr_02_bus_reset & "000" & nr_02_generate_mf_nmi & nr_02_generate_divmmc_nmi & nr_02_reset_type(1 downto 0);
+               port_253b_dat <= nr_02_bus_reset & '0' & nr_02_io_trap & nr_02_generate_mf_nmi & nr_02_generate_divmmc_nmi & nr_02_reset_type(1 downto 0);
          
             when X"03" =>
                port_253b_dat <= nr_palette_sub_idx & nr_03_machine_timing & nr_03_user_dt_lock & nr_03_machine_type;
@@ -5934,6 +6048,12 @@ begin
             
             when X"CE" =>
                port_253b_dat <= '0' & nr_ce_dma_int_en_2_654 & '0' & nr_ce_dma_int_en_2_210;
+            
+            when X"D8" =>
+               port_253b_dat <= "0000000" & nr_d8_io_trap_fdc_en;
+            
+            when X"D9" =>
+               port_253b_dat <= nr_d9_io_trap_write;
 
             when others =>
                port_253b_dat <= (others => '0');
@@ -5981,7 +6101,7 @@ begin
    begin
       if rising_edge(i_CLK_28) then
          hotkeys_1 <= hotkeys_0;
-         hotkeys_0 <= (i_SPKEY_FUNCTION(10) or nr_02_generate_divmmc_nmi) & (i_SPKEY_FUNCTION(9) or nr_02_generate_mf_nmi) & i_SPKEY_FUNCTION(8 downto 1);
+         hotkeys_0 <= (i_SPKEY_FUNCTION(10) or nr_02_generate_divmmc_nmi) & (i_SPKEY_FUNCTION(9) or nr_02_generate_mf_nmi or nr_02_generate_io_trap_nmi) & i_SPKEY_FUNCTION(8 downto 1);
       end if;
    end process;
 

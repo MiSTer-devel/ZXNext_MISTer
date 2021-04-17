@@ -83,7 +83,7 @@ architecture z80dma_unit of z80dma is
    signal R2_portB_timming_byte_s : std_logic_vector (1 downto 0) := "01";
    signal R2_portB_preescaler_s  : std_logic_vector (7 downto 0);
 
-   signal R3_dma_en_s            : std_logic; 
+   --signal R3_dma_en_s            : std_logic; 
    --signal R3_int_en_s          : std_logic;
    --signal R3_stop_match_s         : std_logic;
    --signal R3_mask_s               : std_logic_vector (7 downto 0);
@@ -96,7 +96,7 @@ architecture z80dma_unit of z80dma is
    --signal R4_interrupt_vector_s   : std_logic_vector (7 downto 0);
    
    --signal R5_ready_act_hi_s    : std_logic; -- 0 = READY activel low, 1 = READY active high
-   signal R5_ce_wait_s           : std_logic;-- 0 = CE only, 1 = CE / WAIT multiplexed
+   --signal R5_ce_wait_s           : std_logic;-- 0 = CE only, 1 = CE / WAIT multiplexed
    signal R5_auto_restart_s      : std_logic;-- 0 = stop on end, 1 = auto restart
    
    signal R6_read_mask_s         : std_logic_vector (7 downto 0);
@@ -128,7 +128,7 @@ architecture z80dma_unit of z80dma is
    
    signal DMA_timer_s : std_logic_vector(13 downto 0);
    
-   signal read_count_s : std_logic_vector(2 downto 0);
+   --signal read_count_s : std_logic_vector(2 downto 0);
    
    signal cpu_busreq_n_s : std_logic;
    
@@ -234,14 +234,14 @@ begin
             R2_portB_timming_byte_s <= "01";
             R2_portB_preescaler_s <= X"00";
             R4_mode_s <= "01";
-            R5_ce_wait_s <= '0';
+            --R5_ce_wait_s <= '0';
             R5_auto_restart_s <= '0';
             R6_read_mask_s <= "01111111";
             
             status_atleastone <= '0';
             status_endofblock_n <= '1';
             
-            read_count_s <= "000";
+            --read_count_s <= "000";
             reg_rd_seq_s := RD_STATUS;
 
        else
@@ -573,7 +573,7 @@ begin
                                  
                                  reg_temp <= cpu_d_i;
                                  
-                                 R3_dma_en_s <= cpu_d_i(6);
+                                 --R3_dma_en_s <= cpu_d_i(6);
                                  
                                  if cpu_d_i(6) = '1' then
                                     dma_seq_s <= START_DMA;
@@ -619,7 +619,7 @@ begin
                                  reg_temp <= cpu_d_i;
 
                               -- R5_ready_act_hi_s <= cpu_d_i(3);
-                                 R5_ce_wait_s <= cpu_d_i(4);
+                                 --R5_ce_wait_s <= cpu_d_i(4);
                                  R5_auto_restart_s <= cpu_d_i(5);
 
                                  reg_wr_seq_s := IDLE;
@@ -641,7 +641,7 @@ begin
                                  R1_portA_timming_byte_s <= "01";
                                  R2_portB_timming_byte_s <= "01";
                                  R2_portB_preescaler_s <= x"00";
-                                 R5_ce_wait_s <= '0';
+                                 --R5_ce_wait_s <= '0';
                                  R5_auto_restart_s <= '0';
                               
                               elsif cpu_d_i(7 downto 0) = X"C7" then -- reset port A timming

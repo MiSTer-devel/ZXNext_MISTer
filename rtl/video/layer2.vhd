@@ -172,7 +172,7 @@ begin
    layer2_bank_eff <= (('0' & layer2_active_bank_q(6 downto 4)) + 1) & layer2_active_bank_q(3 downto 0);
    layer2_addr_eff <= (layer2_bank_eff + ("00000" & layer2_addr(16 downto 14))) & layer2_addr(13 downto 0);
    
-   layer2_en <= '1' when layer2_en_q = '1' and layer2_clip_en = '1' and layer2_addr_eff(21) = '0' and layer2_addr_eff(20 downto 18) /= "111" else '0';
+   layer2_en <= '1' when layer2_en_q = '1' and layer2_clip_en = '1' and layer2_addr_eff(21) = '0' else '0';
    
    process (i_CLK_28)
    begin

@@ -291,7 +291,7 @@ architecture rtl of T80N is
    signal reg_direct_add_H_b : std_logic_vector(2 downto 0);
    signal reg_direct_add_L_b : std_logic_vector(2 downto 0);
    signal reg_direct_add_H_c : std_logic_vector(2 downto 0);
-   signal reg_direct_add_L_c : std_logic_vector(2 downto 0);
+   --signal reg_direct_add_L_c : std_logic_vector(2 downto 0);
    
    signal reg_direct_val_H_a: std_logic_vector(7 downto 0) := (others=>'0');
    signal reg_direct_val_H_b: std_logic_vector(7 downto 0) := (others=>'0');              
@@ -763,7 +763,7 @@ begin
             reg_direct_add_H_b <= Alternate & dHL; -- H
             reg_direct_add_L_b <= Alternate & dHL; -- L
             reg_direct_add_H_c <= Alternate & dBC; -- B
-            reg_direct_add_L_c <= Alternate & dBC; -- C
+            --reg_direct_add_L_c <= Alternate & dBC; -- C
                         
             case Z80N_command_s is
             
