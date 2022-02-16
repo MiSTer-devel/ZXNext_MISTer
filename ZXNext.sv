@@ -29,7 +29,7 @@ module emu
 	input         RESET,
 
 	//Must be passed to hps_io module
-	inout  [45:0] HPS_BUS,
+	inout  [48:0] HPS_BUS,
 
 	//Base video clock. Usually equals to CLK_SYS.
 	output        CLK_VIDEO,
@@ -55,6 +55,7 @@ module emu
 
 	input  [11:0] HDMI_WIDTH,
 	input  [11:0] HDMI_HEIGHT,
+	output        HDMI_FREEZE,
 
 `ifdef MISTER_FB
 	// Use framebuffer in DDRAM (USE_FB=1 in qsf)
@@ -187,6 +188,7 @@ assign UART_DTR = 0;
 
 assign VGA_SCALER = 0;
 assign VGA_F1 = 0;
+assign HDMI_FREEZE = 0;
 
 // Status Bit Map:
 //              Upper                          Lower
@@ -199,8 +201,8 @@ assign VGA_F1 = 0;
 `include "build_id.v" 
 localparam CONF_STR = {
 	"ZXNext;;",
-	"S0,VHD,Mount C:;",
-	"S1,VHD,Mount D:;",
+	"SC0,VHD,Mount C:;",
+	"SC1,VHD,Mount D:;",
 	"O1,Hard Reset on C: mount,No,Yes;",
    "-;",
 	"F1,TZXCSW,Load Tape,30000000;",
@@ -248,13 +250,13 @@ wire [24:0] ps2_mouse;
 wire  [7:0] ps2_mouse_ext;
 wire [15:0] joy_0, joy_1;
 
-wire [31:0] sd_lba = (sd_rd[0]|sd_wr[0]) ? sd0_lba : sd1_lba;
+wire [31:0] sd_lba[2];
 wire  [1:0] sd_rd;
 wire  [1:0] sd_wr;
 wire  [1:0] sd_ack;
 wire  [7:0] sd_buff_addr;
 wire [15:0] sd_buff_dout;
-wire [15:0] sd_buff_din = sd_ack[0] ? sd0_buff_din : sd1_buff_din;
+wire [15:0] sd_buff_din[2];
 wire        sd_buff_wr;
 wire  [1:0] img_mounted;
 wire [63:0] img_size;
@@ -270,12 +272,11 @@ wire        ioctl_download;
 wire  [7:0] ioctl_index;
 wire        ioctl_wait;
 
-hps_io #(.STRLEN($size(CONF_STR)>>3), .VDNUM(2), .WIDE(1)) hps_io
+hps_io #(.CONF_STR(CONF_STR), .VDNUM(2), .WIDE(1)) hps_io
 (
 	.clk_sys(clk_sys),
 	.HPS_BUS(HPS_BUS),
 
-	.conf_str(CONF_STR),
 	.forced_scandoubler(forced_scandoubler),
 
 	.joystick_0(joy_0),
@@ -442,6 +443,7 @@ video_mixer #(.LINE_LENGTH(740), .GAMMA(1)) video_mixer
 	.HSync(~HSync_n),
 	.VBlank(~VBlank_n),
 	.HBlank(~HBlank_n | narrow_hbl),
+	.freeze_sync(),
 	
 	.R({rgb_r,rgb_r,rgb_r[2:1]}),
 	.G({rgb_g,rgb_g,rgb_g[2:1]}),
@@ -496,8 +498,6 @@ end
 
 wire        sdss0;
 wire        vsdmiso0;
-wire [31:0] sd0_lba;
-wire [15:0] sd0_buff_din;
 
 sd_card #(.WIDE(1)) sd_card_0
 (
@@ -505,11 +505,11 @@ sd_card #(.WIDE(1)) sd_card_0
 
 	.img_mounted(img_mounted[0]),
 
-	.sd_lba(sd0_lba),
+	.sd_lba(sd_lba[0]),
 	.sd_rd(sd_rd[0]),
 	.sd_wr(sd_wr[0]),
 	.sd_ack(sd_ack[0]),
-	.sd_buff_din(sd0_buff_din),
+	.sd_buff_din(sd_buff_din[0]),
 
 	.clk_spi(clk_sys),
 	.sdhc(1),
@@ -527,8 +527,6 @@ end
 
 wire        sdss1;
 wire        vsdmiso1;
-wire [31:0] sd1_lba;
-wire [15:0] sd1_buff_din;
 
 sd_card #(.WIDE(1)) sd_card_1
 (
@@ -536,11 +534,11 @@ sd_card #(.WIDE(1)) sd_card_1
 
 	.img_mounted(img_mounted[1]),
 
-	.sd_lba(sd1_lba),
+	.sd_lba(sd_lba[1]),
 	.sd_rd(sd_rd[1]),
 	.sd_wr(sd_wr[1]),
 	.sd_ack(sd_ack[1]),
-	.sd_buff_din(sd1_buff_din),
+	.sd_buff_din(sd_buff_din[1]),
 
 	.clk_spi(clk_sys),
 	.sdhc(1),
