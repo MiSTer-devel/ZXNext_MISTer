@@ -1,4 +1,4 @@
-# [ZX Spectrum Next](https://www.specnext.com/) for MiSTer
+# [ZX Spectrum Next](https://www.specnext.com/) for [MiSTer Platform](https://github.com/MiSTer-devel/Main_MiSTer/wiki)
 
 Port of original [ZX Spectrum Next core](https://gitlab.com/SpectrumNext/ZX_Spectrum_Next_FPGA) developed by Alvin Albrecht, Victor Trucco and Fabio Belavenuto.
 
@@ -13,7 +13,7 @@ Port of original [ZX Spectrum Next core](https://gitlab.com/SpectrumNext/ZX_Spec
 
 ## Installation
 - Place rbf into root of SD card.
-- Unpack and place boot.vhd into `/Games/ZXNext` folder. Alternatively you can rename it to ZXNext.vhd and place into root of SD card.
+- Unpack and place boot.vhd (from releases folder) into `/Games/ZXNext` folder. Alternatively you can rename it to ZXNext.vhd and place into root of SD card.
 
 
 ## SD card
