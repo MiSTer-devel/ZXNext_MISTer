@@ -56,12 +56,16 @@ entity im2_device is
       i_CLK_CPU         : in std_logic;
       i_reset_n         : in std_logic;
       
+	  i_im2_mode        : in std_logic;   -- 1 if z80 is in im 2 mode (set 1 if unknown)
       i_m1_n            : in std_logic;
       i_iorq_n          : in std_logic;
       
-      i_int_req         : in std_logic;   -- peripheral wants to generate an interrupt
+      i_int_req         : in std_logic;   -- peripheral wants to generate an interrupt, hold high
       o_int_n           : out std_logic;  -- interrupt signal for z80
-      
+  
+      i_dma_int_en      : in  std_logic;  -- enable dma interruption
+      o_dma_int         : out std_logic;  -- interrupt dma operation 
+  
       i_reti_decode     : in std_logic;
       i_reti_seen       : in std_logic;
       o_isr_serviced    : out std_logic;
@@ -76,7 +80,7 @@ end entity;
 
 architecture rtl of im2_device is
 
-   type state_t         is (S_0, S_PEND, S_REQ, S_ACK, S_ISR);
+   type state_t         is (S_0, S_REQ, S_ACK, S_ISR);
    signal state         : state_t;
    signal state_next    : state_t;
 
@@ -95,23 +99,18 @@ begin
       end if;
    end process;
    
-   process (state, i_m1_n, i_iorq_n, i_int_req, i_iei, i_reti_seen)
+   process (state, i_m1_n, i_iorq_n, i_int_req, i_iei, i_reti_seen, i_im2_mode)
    begin
       case state is
          when S_0 =>
-            if i_int_req = '1' then
-               state_next <= S_PEND;
-            else
-               state_next <= S_0;
-            end if;
-         when S_PEND =>
-            if i_m1_n = '1' then
+			if i_int_req = '1' and i_m1_n = '1' then
                state_next <= S_REQ;
             else
-               state_next <= S_PEND;
-            end if;               
+               state_next <= S_0;
+            end if;          
+             
          when S_REQ =>
-            if i_m1_n = '0' and i_iorq_n = '0' and i_iei = '1' then
+			if i_m1_n = '0' and i_iorq_n = '0' and i_iei = '1' and i_im2_mode = '1' then
                state_next <= S_ACK;
             else
                state_next <= S_REQ;
@@ -123,7 +122,7 @@ begin
                state_next <= S_ACK;
             end if;
          when S_ISR =>
-            if i_reti_seen = '1' and i_iei = '1' then
+            if i_reti_seen = '1' and i_iei = '1' and i_im2_mode = '1' then
                state_next <= S_0;
             else
                state_next <= S_ISR;
@@ -138,7 +137,7 @@ begin
    process (state, i_iei, i_reti_decode)
    begin
       case state is
-         when S_0 | S_PEND =>
+         when S_0 =>
             o_ieo <= i_iei;
          when S_REQ =>
             o_ieo <= i_iei and i_reti_decode;
@@ -149,7 +148,9 @@ begin
 
    -- output z80 interrupt request
    
-   o_int_n <= '0' when state = S_REQ and i_iei = '1' else '1';
+	o_int_n <= '0' when state = S_REQ and i_iei = '1' and i_im2_mode = '1' else '1';
+	o_dma_int <= '1' when state /= S_0 and i_dma_int_en = '1' else '0';
+
 
    -- output interrupt vector
    

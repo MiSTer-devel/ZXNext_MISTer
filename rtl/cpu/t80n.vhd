@@ -187,7 +187,6 @@ architecture rtl of T80N is
    signal BusAck        : std_logic;
    signal ClkEn         : std_logic;
    signal NMI_s         : std_logic;
-   signal INT_n_d       : std_logic;
    signal INT_s         : std_logic;
    signal IStatus       : std_logic_vector(1 downto 0);
 
@@ -251,6 +250,7 @@ architecture rtl of T80N is
    signal ExchangeRp    : std_logic;
    signal ExchangeAF    : std_logic;
    signal ExchangeRS    : std_logic;
+   signal ExchangeWH    : std_logic;
    signal I_DJNZ        : std_logic;
    signal I_CPL         : std_logic;
    signal I_CCF         : std_logic;
@@ -291,7 +291,7 @@ architecture rtl of T80N is
    signal reg_direct_add_H_b : std_logic_vector(2 downto 0);
    signal reg_direct_add_L_b : std_logic_vector(2 downto 0);
    signal reg_direct_add_H_c : std_logic_vector(2 downto 0);
-   --signal reg_direct_add_L_c : std_logic_vector(2 downto 0);
+   signal reg_direct_add_L_c : std_logic_vector(2 downto 0);
    
    signal reg_direct_val_H_a: std_logic_vector(7 downto 0) := (others=>'0');
    signal reg_direct_val_H_b: std_logic_vector(7 downto 0) := (others=>'0');              
@@ -360,6 +360,7 @@ begin
          ExchangeRp => ExchangeRp,
          ExchangeAF => ExchangeAF,
          ExchangeRS => ExchangeRS,
+         ExchangeWH => ExchangeWH,
          I_DJNZ => I_DJNZ,
          I_CPL => I_CPL,
          I_CCF => I_CCF,
@@ -512,6 +513,11 @@ begin
                   IR <= "00000000";
                else
                   IR <= DInst;
+               end if;
+
+               if IntCycle = '1' and IStatus = "10" then
+                  -- IM2 vector address low byte from bus
+                  TmpAddr(7 downto 0) <= DInst;
                end if;
 
                ISet <= "00";
@@ -763,7 +769,7 @@ begin
             reg_direct_add_H_b <= Alternate & dHL; -- H
             reg_direct_add_L_b <= Alternate & dHL; -- L
             reg_direct_add_H_c <= Alternate & dBC; -- B
-            --reg_direct_add_L_c <= Alternate & dBC; -- C
+            reg_direct_add_L_c <= Alternate & dBC; -- C
                         
             case Z80N_command_s is
             
@@ -1432,6 +1438,9 @@ begin
          -- EX HL,DL
          Alternate & "10" when ExchangeDH = '1' and TState = 3 else
          Alternate & "01" when ExchangeDH = '1' and TState = 4 else
+         -- EX (SP),HL (HL(IX,IY) <= WZ)
+         Alternate & "10" when ExchangeWH = '1' and XY_State = "00" and TState = 4 else
+         XY_State(1) & "11" when ExchangeWH = '1' and TState = 4 else
          -- Bus A / Write
          RegAddrA_r;
 
@@ -1445,7 +1454,7 @@ begin
          signed(RegBusA) + 1;
 
    process (Save_ALU_r, Auto_Wait_t1, ALU_OP_r, Read_To_Reg_r,
-         ExchangeDH, IncDec_16, MCycle, TState, WAIT_n)
+         ExchangeDH, ExchangeWH, IncDec_16, MCycle, TState, WAIT_n)
    begin
       RegWEH <= '0';
       RegWEL <= '0';
@@ -1464,6 +1473,11 @@ begin
          RegWEL <= '1';
       end if;
 
+      if ExchangeWH = '1' and TState = 4 then
+         RegWEH <= '1';
+         RegWEL <= '1';
+      end if;
+
       if IncDec_16(2) = '1' and ((TState = 2 and WAIT_n = '1' and MCycle /= "001") or (TState = 3 and MCycle = "001")) then
          case IncDec_16(1 downto 0) is
          when "00" | "01" | "10" =>
@@ -1475,7 +1489,7 @@ begin
    end process;
 
    process (Save_Mux, RegBusB, RegBusA_r, ID16,
-         ExchangeDH, IncDec_16, MCycle, TState, WAIT_n)
+         ExchangeDH, ExchangeWH, TmpAddr, IncDec_16, MCycle, TState, WAIT_n)
    begin
       RegDIH <= Save_Mux;
       RegDIL <= Save_Mux;
@@ -1487,6 +1501,10 @@ begin
       if ExchangeDH = '1' and TState = 4 then
          RegDIH <= RegBusA_r(15 downto 8);
          RegDIL <= RegBusA_r(7 downto 0);
+      end if;
+      if ExchangeWH = '1' and TState = 4 then
+         RegDIH <= TmpAddr(15 downto 8);
+         RegDIL <= TmpAddr(7 downto 0);
       end if;
 
       if IncDec_16(2) = '1' and ((TState = 2 and MCycle /= "001") or (TState = 3 and MCycle = "001")) then
@@ -1695,15 +1713,13 @@ begin
       
          if RESET_n = '0' then
             BusReq_s <= '0';
-            INT_n_d <= '0';
             INT_s <= '0';
             NMI_s <= '0';
             OldNMI_n := '0';
 
          elsif CEN = '1' then
             BusReq_s <= not BUSRQ_n;
-            INT_n_d <= INT_n;
-            INT_s <= not INT_n_d;
+            INT_s <= not INT_n;
             if NMICycle = '1' then
                NMI_s <= '0';
             elsif NMI_n = '0' and OldNMI_n = '1' then
@@ -1740,12 +1756,13 @@ begin
             M1_n <= '1';
          
          elsif CEN = '1' then
+            Auto_Wait_t2 <= Auto_Wait_t1;
             if T_Res = '1' then
                Auto_Wait_t1 <= '0';
+               Auto_Wait_t2 <= '0';
             else
                Auto_Wait_t1 <= Auto_Wait or IORQ_i;
             end if;
-            Auto_Wait_t2 <= Auto_Wait_t1;
             No_BTR <= (I_BT and (not IR(4) or not F(Flag_P))) or
                   (I_BC and (not IR(4) or F(Flag_Z) or not F(Flag_P))) or
                   (I_BTR and (not IR(4) or F(Flag_Z)));
@@ -1835,10 +1852,8 @@ begin
    process (IntCycle, NMICycle, MCycle)
    begin
       Auto_Wait <= '0';
-      if IntCycle = '1' or NMICycle = '1' then
-         if MCycle = "001" then
-            Auto_Wait <= '1';
-         end if;
+      if IntCycle = '1' and MCycle = "001" then
+         Auto_Wait <= '1';
       end if;
    end process;
 

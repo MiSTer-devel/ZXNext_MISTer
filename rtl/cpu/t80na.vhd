@@ -129,6 +129,7 @@ architecture rtl of T80Na is
    signal IORQ_t2          : std_logic;   -- 30/10/19 Charlie Ingley-- add IORQ control
    signal IORQ_rw       : std_logic;   -- 30/10/19 Charlie Ingley-- add IORQ control
    signal IORQ_int         : std_logic;   -- 30/10/19 Charlie Ingley-- add IORQ interrupt control
+   signal IORQ_int_inhibit : std_logic_vector(2 downto 0);
    signal RD_n_i        : std_logic;
    signal WR_n_i        : std_logic;
    signal WR_t2         : std_logic;   -- 30/10/19 Charlie Ingley-- add WR control
@@ -147,10 +148,10 @@ begin
    BUSAK_n <= BUSAK_n_i;                                    -- 30/10/19 Charlie Ingley - IORQ/RD/WR changes
    MREQ_rw <= MREQ and (Req_Inhibit or MReq_Inhibit);             --          added MREQ timing control
    MREQ_n_i <= not MREQ_rw;                                 --          changed MREQ generation 
-   IORQ_rw <= IORQ and not (IORQ_t1 or IORQ_t2);                  --          added IORQ generation timing control
-   IORQ_n_i <= not (IORQ_int or IORQ_rw);                         --          changed IORQ generation
-   RD_n_i <= not (RD and (MREQ_rw or IORQ_rw));                --          changed RD/IORQ generation
-   WR_n_i <= not (Write and ((WR_t2 and MREQ_rw) or IORQ_rw));       --          added WR/IORQ timing control
+   IORQ_rw <= IORQ and not (IORQ_t1 or IORQ_t2);                        --          added IORQ generation timing control
+   IORQ_n_i <= not ((IORQ_int and not IORQ_int_inhibit(2)) or IORQ_rw); --          changed IORQ generation
+   RD_n_i <= not (RD and (MREQ_rw or IORQ_rw));                         --          changed RD/IORQ generation
+   WR_n_i <= not (Write and ((WR_t2 and MREQ_rw) or IORQ_rw));          --          added WR/IORQ timing control
 
 -- MREQ_n <= MREQ_n_i when BUSAK_n_i = '1' else 'Z';
 -- IORQ_n <= IORQ_n_i when BUSAK_n_i = '1' else 'Z';
@@ -313,7 +314,23 @@ begin
          end if;
       end if;
    end process;
-   
+
+   process(Reset_s,CLK_n)
+   begin
+      if Reset_s = '0' then
+         IORQ_int_inhibit <= "111";
+      elsif CLK_n'event and CLK_n = '0' then
+         if IntCycle_n = '0' then
+            if MCycle = "001" then
+               IORQ_int_inhibit <= IORQ_int_inhibit(1 downto 0) & '0';
+            end if;
+            if MCycle = "010" then
+               IORQ_int_inhibit <= "111";
+            end if;
+         end if;
+      end if;
+   end process;
+
 -- 30/10/19 Charlie Ingley - Generate IORQ_t1 for IORQ timing control
    process(Reset_s, CLK_n)
    begin

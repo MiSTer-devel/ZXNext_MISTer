@@ -29,10 +29,12 @@ use ieee.std_logic_unsigned.all;
 
 entity zxnext_top is
    generic (
-      g_machine_id      : unsigned(7 downto 0)  := X"0A";   -- MiSTer
+      g_machine_id      : unsigned(7 downto 0)  := X"DA";   -- MiSTer
+		g_video_def       : unsigned(2 downto 0)  := "000";   -- video mode default (0-6, vga-0 & vga-1 produce hdmi if hdmi module is included)
       g_version         : unsigned(7 downto 0)  := X"32";   -- 3.01
       g_sub_version     : unsigned(7 downto 0)  := X"00";    -- .10
-	  g_board_issue     : unsigned(3 downto 0)  := X"2"  
+	   g_board_issue     : unsigned(3 downto 0)  := X"0";
+      g_video_inc       : unsigned(1 downto 0)  := "10"     -- bit 1 = 1 to include HDMI module, bit 0 = 1 to include VGA module (if changed see zxnext_pins_issue2.ucf)		
    );
    port (
 		-- Clocks
@@ -406,7 +408,9 @@ begin
       g_machine_id         => g_machine_id,
       g_version            => g_version,
       g_sub_version        => g_sub_version,
-	   g_board_issue        => g_board_issue
+	   g_board_issue        => g_board_issue,
+		g_video_def				=> g_video_def,
+		g_video_inc				=> g_video_inc
    )
    port map
    (
@@ -427,7 +431,7 @@ begin
       -- RESET
 
       i_RESET              => reset,
-      i_BOOT               => ps2_kbd_fn(1) or HW_RESET,
+      --i_BOOT               => ps2_kbd_fn(1) or HW_RESET,
       
       o_RESET_HARD         => zxn_reset_hard,
       o_RESET_SOFT         => zxn_reset_soft,
@@ -541,7 +545,28 @@ begin
 
       i_GPIO               => (others => '1'),
       o_GPIO               => open,
-      o_GPIO_EN            => open
+      o_GPIO_EN            => open,
+	        -- XILINX PERIPHERALS
+      
+      o_XDNA_LOAD          => open,
+      o_XDNA_SHIFT         => open,
+      i_XDNA_DO            => '0',
+      
+      o_XADC_RESET         => open,
+      
+      o_XADC_DEN           => open,
+      o_XADC_DADDR         => open,
+      o_XADC_DWE           => open,
+      i_XADC_DRDY          => '0',
+      o_XADC_DI            => open,
+      i_XADC_DO            => (others => '0'),
+      
+      i_XADC_BUSY          => '0',
+      i_XADC_EOC           => '0',
+      i_XADC_EOS           => '0',
+      o_XADC_CONVST        => open,
+
+      o_XADC_CONTROL       => open
    );
 
    audio_L <= (others => '1') when zxn_audio_L_pre(12) = '1' else zxn_audio_L_pre(11 downto 0);

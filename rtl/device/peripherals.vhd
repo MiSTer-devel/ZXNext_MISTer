@@ -30,7 +30,8 @@ use ieee.std_logic_unsigned.all;
 entity peripherals is
    generic (
       constant NUM_PERIPH  : positive := 14;
-      constant VEC_BITS    : positive := 4
+      constant VEC_BITS    : positive := 4;
+	  constant EXCEPTION   : std_logic_vector(16 downto 1) := (others => '0') 
    );
    port (
       i_CLK_28             : in std_logic;
@@ -39,11 +40,14 @@ entity peripherals is
       
       i_m1_n               : in std_logic;
       i_iorq_n             : in std_logic;
-      
+	  
+	  i_im2_mode           : in std_logic;
       i_mode_pulse_0_im2_1 : in std_logic;
    
-      i_int_req            : in std_logic_vector(NUM_PERIPH downto 1);
       i_int_en             : in std_logic_vector(NUM_PERIPH downto 1);
+	  i_int_req            : in std_logic_vector(NUM_PERIPH downto 1);
+      i_int_unq            : in std_logic_vector(NUM_PERIPH downto 1);
+
       
       o_int_status         : out std_logic_vector(NUM_PERIPH downto 1);
       i_int_status_clear   : in std_logic_vector(NUM_PERIPH downto 1);
@@ -85,7 +89,9 @@ begin
    
       peripheral: entity work.im2_peripheral
       generic map (
-         VEC_BITS                => VEC_BITS
+        VEC_BITS                => VEC_BITS,
+        EXCEPTION               => EXCEPTION(I)
+
       )
       port map (
          i_CLK_28                => i_CLK_28,
@@ -95,6 +101,7 @@ begin
          i_m1_n                  => i_m1_n,
          i_iorq_n                => i_iorq_n,
       
+	     i_im2_mode              => i_im2_mode,
          i_mode_pulse_0_im2_1    => i_mode_pulse_0_im2_1,
       
          i_iei                   => ie(I-1),
@@ -105,7 +112,8 @@ begin
       
          i_int_en                => i_int_en(I),
          i_int_req               => i_int_req(I),
-   
+         i_int_unq               => i_int_unq(I),
+
          i_int_status_clear      => i_int_status_clear(I),
          o_int_status            => o_int_status(I),
 
@@ -160,7 +168,7 @@ begin
          tmp_pulse_en := tmp_pulse_en or pulse_en(I);
       end loop;
    
-      o_pulse_en <= tmp_pulse_en;  -- and not i_mode_pulse_0_im2_1;
+      o_pulse_en <= tmp_pulse_en;
    end process;
 
    -- interrupt dma operation
@@ -174,7 +182,7 @@ begin
          tmp_dma_int := tmp_dma_int or dma_int(I);
       end loop;
       
-      o_dma_int <= tmp_dma_int;  -- and i_mode_pulse_0_im2_1;
+      o_dma_int <= tmp_dma_int;
    end process;
 
 end architecture;
