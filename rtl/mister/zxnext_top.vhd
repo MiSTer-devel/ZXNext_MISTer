@@ -29,10 +29,12 @@ use ieee.std_logic_unsigned.all;
 
 entity zxnext_top is
    generic (
-      g_machine_id      : unsigned(7 downto 0)  := X"0A";   -- MiSTer
-      g_version         : unsigned(7 downto 0)  := X"32";   -- 3.01
-      g_sub_version     : unsigned(7 downto 0)  := X"00";    -- .10
-	  g_board_issue     : unsigned(3 downto 0)  := X"2"  
+      g_machine_id      : unsigned(7 downto 0)  := X"0A";
+		g_video_def       : unsigned(2 downto 0)  := "000";  		
+      g_version         : unsigned(7 downto 0)  := X"32";   
+      g_sub_version     : unsigned(7 downto 0)  := X"00";
+	   g_board_issue     : unsigned(3 downto 0)  := X"2";
+	   g_video_inc       : unsigned(1 downto 0)  := "10"   
    );
    port (
 		-- Clocks
@@ -404,9 +406,11 @@ begin
    generic map
    (
       g_machine_id         => g_machine_id,
+		g_video_def				=> g_video_def,
       g_version            => g_version,
       g_sub_version        => g_sub_version,
-	   g_board_issue        => g_board_issue
+	   g_board_issue        => g_board_issue,
+		g_video_inc				=> g_video_inc
    )
    port map
    (

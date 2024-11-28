@@ -31,8 +31,8 @@ use ieee.std_logic_unsigned.all;
 
 entity im2_peripheral is
    generic (
-      constant VEC_BITS       : positive := 4;
-	  constant EXCEPTION      : std_logic := '0'  -- 1 if im2 mode but z80 not in im2 should generate pulse interrupt
+      constant VEC_BITS       : positive  := 4;
+      constant EXCEPTION      : std_logic := '0'  -- 1 if im2 mode but z80 not in im2 should generate pulse interrupt
    );
    port (
       i_CLK_28                : in std_logic;
@@ -44,7 +44,6 @@ entity im2_peripheral is
       
       i_im2_mode              : in std_logic;    -- 1 if z80 is in im 2 mode, 1 if unknown
       i_mode_pulse_0_im2_1    : in std_logic;    -- select standard pulsed zx mode or hw im2 mode
-
       
       i_iei                   : in std_logic;    -- im2 daisy chain
       o_ieo                   : out std_logic;   -- im2 daisy chain
@@ -54,9 +53,8 @@ entity im2_peripheral is
       
       i_int_en                : in std_logic;    -- enable interrupts from this device
       i_int_req               : in std_logic;    -- interrupt request from this device (level active, must not persist through im2_isr_serviced signal)
-   
       i_int_unq               : in std_logic;    -- unqualifed interrupt request from this device (enable not required)
-		 
+    
       i_int_status_clear      : in std_logic;    -- clear interrupt status bit if 1 (i_CLK_28)
       o_int_status            : out std_logic;   -- current state of interrupt status bit (i_CLK_28)
 
@@ -104,11 +102,9 @@ begin
    
    int_req <= i_int_req and not int_req_d;
 
-      
    -- im2 device logic
-    im2_reset_n <= i_mode_pulse_0_im2_1 and not i_reset;
-
-
+   
+   im2_reset_n <= i_mode_pulse_0_im2_1 and not i_reset;
    
    im2_logic: entity work.im2_device
    generic map (
@@ -158,6 +154,8 @@ begin
 
 
    
+   -- record of whether interrupt request came from device, can be cleared
+         
    process (i_CLK_28)
    begin
       if rising_edge(i_CLK_28) then
@@ -169,10 +167,9 @@ begin
       end if;
    end process;
    
-      -- im2 mode interrupt pending, only cleared when isr serviced
+   -- im2 mode interrupt pending, only cleared when isr serviced
    
-
-      process (i_CLK_28)
+   process (i_CLK_28)
    begin
       if rising_edge(i_CLK_28) then
          if im2_reset_n = '0' then
@@ -184,7 +181,6 @@ begin
          end if;
       end if;
    end process;
-
 
    o_int_status <= int_status or im2_int_req;
    

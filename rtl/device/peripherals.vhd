@@ -31,7 +31,7 @@ entity peripherals is
    generic (
       constant NUM_PERIPH  : positive := 14;
       constant VEC_BITS    : positive := 4;
-	  constant EXCEPTION   : std_logic_vector(16 downto 1) := (others => '0') 
+      constant EXCEPTION   : std_logic_vector(16 downto 1) := (others => '0')  -- make at least as big as max NUM_PERIPH
    );
    port (
       i_CLK_28             : in std_logic;
@@ -41,11 +41,11 @@ entity peripherals is
       i_m1_n               : in std_logic;
       i_iorq_n             : in std_logic;
 	  
-	  i_im2_mode           : in std_logic;
+      i_im2_mode           : in std_logic;
       i_mode_pulse_0_im2_1 : in std_logic;
-   
+
       i_int_en             : in std_logic_vector(NUM_PERIPH downto 1);
-	  i_int_req            : in std_logic_vector(NUM_PERIPH downto 1);
+      i_int_req            : in std_logic_vector(NUM_PERIPH downto 1);
       i_int_unq            : in std_logic_vector(NUM_PERIPH downto 1);
 
       
@@ -89,8 +89,8 @@ begin
    
       peripheral: entity work.im2_peripheral
       generic map (
-        VEC_BITS                => VEC_BITS,
-        EXCEPTION               => EXCEPTION(I)
+         VEC_BITS                => VEC_BITS,
+         EXCEPTION               => EXCEPTION(I)
 
       )
       port map (
@@ -101,7 +101,7 @@ begin
          i_m1_n                  => i_m1_n,
          i_iorq_n                => i_iorq_n,
       
-	     i_im2_mode              => i_im2_mode,
+         i_im2_mode              => i_im2_mode,
          i_mode_pulse_0_im2_1    => i_mode_pulse_0_im2_1,
       
          i_iei                   => ie(I-1),

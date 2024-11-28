@@ -32,6 +32,7 @@ entity audio_mixer is
       
       -- beeper and tape
 
+      exc_i          : in std_logic;
       ear_i          : in std_logic;
       mic_i          : in std_logic;
       
@@ -76,8 +77,8 @@ architecture rtl of audio_mixer is
 
 begin
 
-   ear <= ear_volume when ear_i = '1' else (others => '0');   -- 0 / 512
-   mic <= mic_volume when mic_i = '1' else (others => '0');   -- 0 / 128
+   ear <= ear_volume when (ear_i = '1' and exc_i = '0') else (others => '0');   -- 0 / 512
+   mic <= mic_volume when (mic_i = '1' and exc_i = '0') else (others => '0');   -- 0 / 128
    
    ay_L <= '0' & ay_L_i;   -- 0 - 2295
    ay_R <= '0' & ay_R_i;   -- 0 - 2295
