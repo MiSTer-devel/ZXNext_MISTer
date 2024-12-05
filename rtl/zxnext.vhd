@@ -32,11 +32,11 @@ entity zxnext is
    generic
    (
       g_machine_id         : unsigned(7 downto 0);
-	  g_video_def          : unsigned(2 downto 0);
+      g_video_def          : unsigned(2 downto 0);
       g_version            : unsigned(7 downto 0);
       g_sub_version        : unsigned(7 downto 0);
-	  g_board_issue        : unsigned(3 downto 0);
-      g_video_inc          : unsigned(1 downto 0)												 
+      g_board_issue        : unsigned(3 downto 0);
+      g_video_inc          : unsigned(1 downto 0)
    );
    port
    (
@@ -154,6 +154,8 @@ entity zxnext is
       o_MACHINE_TIMING     : out std_logic_vector(2 downto 0);    -- machine timing: 00X = 48k, 010 = 128k, 011 = +3, 100 = pentagon
       
       o_HDMI_RESET         : out std_logic;
+      o_HDMI_PIXEL         : out std_logic;                       -- pixel available
+      o_HDMI_LOCK          : out std_logic;                       -- frame lock
       
       -- AUDIO
       
@@ -183,8 +185,8 @@ entity zxnext is
       i_RAM_A_DI           : in std_logic_vector(7 downto 0);     -- data read from memory
       o_RAM_A_DO           : out std_logic_vector(7 downto 0);    -- data written to memory
       o_RAM_A_CYCLE          : out std_logic;   
-		o_RAM_A_RFSH         : out std_logic;
-      i_CPU_WAIT           : in std_logic := '0';  -- no seguro si lo usa 0 o 1 
+	  o_RAM_A_RFSH         : out std_logic;
+      i_CPU_WAIT           : in std_logic := '1';  -- no seguro si lo usa 0 o 1 
       
       -- Port B is read only (LAYER 2)
       
@@ -1101,7 +1103,7 @@ architecture rtl of zxnext is
    signal nr_08_psg_turbosound_en            : std_logic := '0';
    signal nr_08_keyboard_issue2  : std_logic := '0';
    signal nr_09_psg_mono         : std_logic_vector(2 downto 0) := (others => '0');
-   signal nr_09_hdmi_audio_disable  : std_logic := '0';
+   signal nr_09_hdmi_audio_en    : std_logic := '1';
    signal nr_09_sprite_tie       : std_logic := '0';
    signal nr_0a_mf_type          : std_logic_vector(1 downto 0) := "00";
    signal nr_0a_divmmc_automap_en            : std_logic := '0';
@@ -1341,7 +1343,8 @@ architecture rtl of zxnext is
    signal vram_bank7_do          : std_logic_vector(7 downto 0);
    
    signal video_timing_change    : std_logic;
-   signal video_timing_change_d  : std_logic := '1';
+   signal video_timing_change_d  : std_logic := '0';
+   signal video_frame_sync       : std_logic;
    
    signal eff_nr_03_machine_timing           : std_logic_vector(2 downto 0) := "011";
    signal eff_nr_05_5060         : std_logic;
@@ -1360,6 +1363,8 @@ architecture rtl of zxnext is
    signal rgb_vsync_n            : std_logic;
    signal rgb_hblank_n           : std_logic;
    signal rgb_vblank_n           : std_logic;
+   signal hdmi_pixel_en          : std_logic;
+   signal hdmi_frame_lock        : std_logic;
    
    signal pulse_int_n            : std_logic;
    signal ula_int_pulse          : std_logic;
@@ -1501,32 +1506,34 @@ architecture rtl of zxnext is
    signal rgb_out_2              : std_logic_vector(8 downto 0);
    signal rgb_out_2a             : std_logic_vector(8 downto 0);
 
-   signal rgb_vsync_n_7          : std_logic;
    signal rgb_vsync_n_6          : std_logic;
    signal rgb_vsync_n_5          : std_logic;
    signal rgb_vsync_n_4          : std_logic;
    signal rgb_vsync_n_3          : std_logic;
-   signal rgb_vblank_n_7         : std_logic;
    signal rgb_vblank_n_6         : std_logic;
    signal rgb_vblank_n_5         : std_logic;
    signal rgb_vblank_n_4         : std_logic;
    signal rgb_vblank_n_3         : std_logic;
-   signal rgb_hblank_n_7         : std_logic;
    signal rgb_hblank_n_6         : std_logic;
    signal rgb_hblank_n_5         : std_logic;
    signal rgb_hblank_n_4         : std_logic;
    signal rgb_hblank_n_3         : std_logic;
-   signal rgb_hsync_n_7          : std_logic;
    signal rgb_hsync_n_6          : std_logic;
    signal rgb_hsync_n_5          : std_logic;
    signal rgb_hsync_n_4          : std_logic;
    signal rgb_hsync_n_3          : std_logic;
-   signal rgb_out_7              : std_logic_vector(8 downto 0);
    signal rgb_out_6              : std_logic_vector(8 downto 0);
    signal rgb_out_5              : std_logic_vector(8 downto 0);
    signal rgb_out_4              : std_logic_vector(8 downto 0);
    signal rgb_out_3              : std_logic_vector(8 downto 0);
-   
+   signal hdmi_pixel_en_7        : std_logic;
+   signal hdmi_pixel_en_6        : std_logic;
+   signal hdmi_pixel_en_5        : std_logic;
+   signal hdmi_pixel_en_4        : std_logic;
+   signal hdmi_pixel_en_3        : std_logic;
+   signal hdmi_pixel_en_2        : std_logic;
+   signal hdmi_pixel_en_1        : std_logic;
+
    signal rgb_vsync_n_o          : std_logic;
    signal rgb_vblank_n_o         : std_logic;
    signal rgb_hblank_n_o         : std_logic;
@@ -1596,14 +1603,15 @@ begin
    o_MACHINE_TIMING <= eff_nr_03_machine_timing;
    
    o_HDMI_RESET <= video_timing_change_d;
+   o_HDMI_PIXEL <= hdmi_pixel_en_7;
+   o_HDMI_LOCK  <= hdmi_frame_lock;
    
-   o_AUDIO_HDMI_AUDIO_EN <= not nr_09_hdmi_audio_disable;
-   
+   o_AUDIO_HDMI_AUDIO_EN <= nr_09_hdmi_audio_en;
+
    o_AUDIO_SPEAKER_EN <= nr_08_internal_speaker_en;
    o_AUDIO_SPEAKER_EXCL <= beep_spkr_excl;
 
    o_AUDIO_MIC <= beep_mic_final;
-   
    o_AUDIO_EAR <= port_fe_ear;
 
    o_AUDIO_L <= pcm_audio_L;
@@ -1693,12 +1701,12 @@ begin
       Z80N_command_o    => Z80N_command_s
    );
 
-   process (i_CLK_CPU)
-   begin
-      if rising_edge(i_CLK_CPU) then
-         dma_mreq_n_d <= dma_mreq_n;
-      end if;
-   end process;
+--   process (i_CLK_CPU)
+--   begin
+--      if rising_edge(i_CLK_CPU) then
+--         dma_mreq_n_d <= dma_mreq_n;
+--      end if;
+--   end process;
    dma_mod: entity work.z80dma
    port map (
       reset_i        => reset,
@@ -1939,6 +1947,7 @@ begin
    end process;
 
    -- pulsed interrupt
+   
    -- duration is 32 cpu cycles for 48K and +3
    -- duration is 36 cpu cycles for 128K and pentagon
 
@@ -3231,7 +3240,7 @@ begin
    spi_miso <= i_SPI_FLASH_MISO when spi_ss_flash_n = '0' else
                pi_spi0_miso     when spi_ss_rpi1_n = '0' or spi_ss_rpi0_n = '0' else
                i_SPI_SD_MISO    when spi_ss_sd1_n = '0' or spi_ss_sd0_n = '0' else '1';
-   
+
    spi_master_mod: entity work.spi_master
    port map (
       clock_i        => i_CLK_CPU,
@@ -4307,6 +4316,11 @@ begin
       clip_y2_i         => unsigned(nr_19_sprite_clip_y2)
    );
 
+-- port_303b_dat <= (others => '0');
+-- sprite_mirror_id <= (others => '0');
+-- sprite_pixel <= (others => '0');
+-- sprite_pixel_en <= '0';
+
    --
    -- TILEMAP
    -- tilemap display
@@ -5060,7 +5074,7 @@ begin
                nr_08_psg_turbosound_en     <= '0';
                nr_08_keyboard_issue2       <= '0';
                nr_09_psg_mono              <= (others => '0');
-               nr_09_hdmi_audio_disable    <= '0';
+               nr_09_hdmi_audio_en         <= '1';
                nr_0a_mf_type               <= "00";
                nr_0a_divmmc_automap_en     <= '0';
                nr_0a_mouse_button_reverse  <= '0';
@@ -5171,7 +5185,7 @@ begin
                when X"09" =>
                   nr_09_psg_mono <= nr_wr_dat(7 downto 5);
                   nr_09_sprite_tie <= nr_wr_dat(4);
-                  nr_09_hdmi_audio_disable <= nr_09_hdmi_audio_disable or nr_wr_dat(2);
+                  nr_09_hdmi_audio_en <= not nr_wr_dat(2);
 --                nr_09_we <= '1';
 
                when X"0A" =>
@@ -5187,8 +5201,8 @@ begin
                   nr_0b_joy_iomode <= nr_wr_dat(5 downto 4);
                   nr_0b_joy_iomode_0 <= nr_wr_dat(0);
                
-               when X"10" =>
-                  nr_10_flashboot <= nr_wr_dat(7);  
+              when X"10" =>
+                 nr_10_flashboot <= nr_wr_dat(7);  
                   if nr_03_config_mode = '1' then
                      nr_10_coreid <= nr_wr_dat(4 downto 0);
                   end if;
@@ -5643,6 +5657,7 @@ begin
 
 --             when X"FA" =>
 --                nr_fa_we <= '1';
+               
 --             when X"FF" =>
 --                reserved for ula+
 
@@ -5656,20 +5671,18 @@ begin
       end if;
    end process;
 
-
  --     process (i_CLK_28)
- --     begin
- --        if rising_edge(i_CLK_28) then
- --           if nr_10_we = '1' then
- --              nr_10_flashboot <= nr_wr_dat(7);
- --              -- zxn issue 2,3 board       
- --              if nr_03_config_mode = '1' then
- --                 nr_10_coreid <= nr_wr_dat(4 downto 0);
- --              end if;
- --           end if;
- --        end if;
- --     end process;
-   
+--      begin
+--         if rising_edge(i_CLK_28) then
+--            if nr_10_we = '1' then
+--               nr_10_flashboot <= nr_wr_dat(7);     
+--               if nr_03_config_mode = '1' then
+--                  nr_10_coreid <= nr_wr_dat(4 downto 0);
+--               end if;
+--            end if;
+--         end if;
+--      end process;
+
 
 
 
@@ -5703,16 +5716,15 @@ begin
       machine_timing_p3 <= '0';
       machine_timing_pentagon <= '0';
       
-      case eff_nr_03_machine_timing is
-         when "000"  | "001" =>
-            machine_timing_48 <= '1';
-         when "010" =>
-            machine_timing_128 <= '1';
-         when "100" =>
-            machine_timing_pentagon <= '1';
-         when others =>
-            machine_timing_p3 <= '1';
-      end case;
+      if eff_nr_03_machine_timing(2) = '1' then
+         machine_timing_pentagon <= '1';
+      elsif eff_nr_03_machine_timing(1 downto 0) = "10" then
+         machine_timing_128 <= '1';
+      elsif eff_nr_03_machine_timing(1 downto 0) = "11" then
+         machine_timing_p3 <= '1';
+      else
+         machine_timing_48 <= '1';
+      end if;
    
    end process;
    
@@ -5770,7 +5782,7 @@ begin
    process (i_CLK_28)
    begin
       if rising_edge(i_CLK_28) then
-         if nr_03_machine_timing = "100" then
+         if nr_03_machine_timing(2) = '1' then
             nr_05_5060 <= '0';   -- Pentagon is always 50 Hz
          elsif nr_05_we = '1' then
             nr_05_5060 <= nr_wr_dat(2);
@@ -5844,7 +5856,7 @@ begin
                port_253b_dat <= (not port_7ffd_locked) & eff_nr_08_contention_disable & nr_08_psg_stereo_mode & nr_08_internal_speaker_en & nr_08_dac_en & nr_08_port_ff_rd_en & nr_08_psg_turbosound_en & nr_08_keyboard_issue2;
 
             when X"09" =>
-               port_253b_dat <= nr_09_psg_mono & nr_09_sprite_tie & '0' & nr_09_hdmi_audio_disable & eff_nr_09_scanlines;
+               port_253b_dat <= nr_09_psg_mono & nr_09_sprite_tie & '0' & (not nr_09_hdmi_audio_en) & eff_nr_09_scanlines;
 
             when X"0A" =>
                port_253b_dat <= nr_0a_mf_type & '0' & nr_0a_divmmc_automap_en & nr_0a_mouse_button_reverse & '0' & nr_0a_mouse_dpi;
@@ -6271,17 +6283,19 @@ begin
       end if;
    end process;
 
-   hotkey_hard_reset <= hotkeys_0(1) and not hotkeys_1(1);                                     -- F1
-   hotkey_scandouble <= hotkeys_0(2) and not hotkeys_1(2);                                     -- F2
-   hotkey_5060 <= hotkeys_0(3) and not hotkeys_1(3) and nr_06_hotkey_5060_en;                  -- F3
-   hotkey_soft_reset <= hotkeys_0(4) and not hotkeys_1(4);                                     -- F4
-   hotkey_expbus_enable <= hotkeys_0(5) and not hotkeys_1(5) and nr_06_hotkey_cpu_speed_en;    -- F5
-   hotkey_expbus_disable <= hotkeys_0(6) and not hotkeys_1(6) and nr_06_hotkey_cpu_speed_en;   -- F6
-   hotkey_scanlines <= hotkeys_0(7) and not hotkeys_1(7);                                      -- F7
-   hotkey_cpu_speed <= hotkeys_0(8) and not hotkeys_1(8) and nr_06_hotkey_cpu_speed_en;        -- F8
-   hotkey_m1 <= hotkeys_0(9) and not hotkeys_1(9);                                             -- F9
-   hotkey_drive <= hotkeys_0(10) and not hotkeys_1(10) and port_divmmc_io_en;                  -- F10
 
+      -- ZX Spectrum Next Core
+      
+      hotkey_hard_reset <= hotkeys_0(1) and not hotkeys_1(1);                                     -- F1
+      hotkey_scandouble <= hotkeys_0(2) and not hotkeys_1(2);                                     -- F2
+      hotkey_5060 <= hotkeys_0(3) and not hotkeys_1(3) and nr_06_hotkey_5060_en;                  -- F3
+      hotkey_soft_reset <= hotkeys_0(4) and not hotkeys_1(4);                                     -- F4
+      hotkey_expbus_enable <= hotkeys_0(5) and not hotkeys_1(5) and nr_06_hotkey_cpu_speed_en;    -- F5
+      hotkey_expbus_disable <= hotkeys_0(6) and not hotkeys_1(6) and nr_06_hotkey_cpu_speed_en;   -- F6
+      hotkey_scanlines <= hotkeys_0(7) and not hotkeys_1(7);                                      -- F7
+      hotkey_cpu_speed <= hotkeys_0(8) and not hotkeys_1(8) and nr_06_hotkey_cpu_speed_en;        -- F8
+      hotkey_m1 <= hotkeys_0(9) and not hotkeys_1(9);                                             -- F9
+      hotkey_drive <= hotkeys_0(10) and not hotkeys_1(10) and port_divmmc_io_en;                  -- F10
 
    nr_02_soft_reset <= (hotkey_soft_reset and not nr_03_config_mode) or (nr_02_we and nr_wr_dat(0));
    nr_02_hard_reset <= hotkey_hard_reset or (nr_02_we and nr_wr_dat(1));
@@ -6380,7 +6394,7 @@ begin
    
    -- i2s pi audio
    
-   i2s_mod : entity work.i2s_transmitter
+   i2s_mod : entity work.i2s_transmiter
    port map
    (
       i_reset        => reset or not pi_i2s_en,
@@ -6608,27 +6622,19 @@ begin
    
    -- changes to video timing occur during vsync
    
-      video_timing_change <= '1' when (eff_nr_05_5060 /= nr_05_5060) or (eff_nr_05_scandouble_en /= nr_05_scandouble_en) or (eff_nr_03_machine_timing /= nr_03_machine_timing) else '0';
+   video_timing_change <= '1' when (eff_nr_05_5060 /= nr_05_5060) or (eff_nr_05_scandouble_en /= nr_05_scandouble_en) or (eff_nr_03_machine_timing(2 downto 1) /= nr_03_machine_timing(2 downto 1)) else '0';
    
    process (i_CLK_7)
    begin
       if rising_edge(i_CLK_7) then
-         if rgb_vsync_n_o = '0' and video_timing_change = '1' then
+         if video_frame_sync = '1' then
             eff_nr_05_5060 <= nr_05_5060;
+            eff_nr_09_scanlines <= nr_09_scanlines;
             eff_nr_05_scandouble_en <= nr_05_scandouble_en;
             eff_nr_03_machine_timing <= nr_03_machine_timing;
-            video_timing_change_d <= '1';
+            video_timing_change_d <= video_timing_change;
          else
             video_timing_change_d <= '0';
-         end if;
-      end if;
-   end process;
-   
-   process (i_CLK_7)
-   begin
-      if rising_edge(i_CLK_7) then
-         if rgb_vsync_n_o = '0' then
-            eff_nr_09_scanlines <= nr_09_scanlines;
          end if;
       end if;
    end process;
@@ -6637,29 +6643,52 @@ begin
 
    timing_mod: entity work.zxula_timing
    port map
-    (
-      clock_i        => i_CLK_7,
-      clock_x4_i     => i_CLK_28,
-      reset_conter_i => video_timing_change_d,
-      mode_i         => eff_nr_03_machine_timing,
-      video_timing_i => nr_11_video_timing,
-      vf50_60_i      => eff_nr_05_5060,
-      cu_offset_i    => nr_64_copper_offset,
-      hcount_o       => hc,
-      vcount_o       => vc,
-      phcount_o      => phc,
-      whcount_o      => whc,
-      wvcount_o      => wvc,
-      cvcount_o      => cvc,
-      sc_o           => sc,
-      hsync_n_o      => rgb_hsync_n,
-      vsync_n_o      => rgb_vsync_n,
-      hblank_n_o     => rgb_hblank_n,
-      vblank_n_o     => rgb_vblank_n,
-      lint_ctrl_i    => ula_int_en,
-      lint_line_i    => nr_23_line_interrupt,
-      ula_int_o      => ula_int_pulse,
-      line_int_o     => line_int_pulse
+   (
+      -- 28 MHz domain
+      
+      i_CLK_28           => i_CLK_28,
+      
+      i_50_60            => eff_nr_05_5060,
+      i_timing           => eff_nr_03_machine_timing,
+      
+      i_cu_offset        => nr_64_copper_offset,
+      
+      -- 7 MHz doman
+   
+      i_CLK_7            => i_CLK_7,
+
+      --o_blank_n          => rgb_blank_n,
+      o_hblank_n     => rgb_hblank_n,-- do not mix hblank y vblank
+      o_vblank_n     => rgb_vblank_n,-- do not mix hblank y vblank
+      o_hsync_n          => rgb_hsync_n,
+      o_vsync_n          => rgb_vsync_n,
+      o_frame_sync       => video_frame_sync,
+      
+      o_hdmi_pixel_en    => hdmi_pixel_en,
+      o_hdmi_frame_lock  => hdmi_frame_lock,
+      
+      o_hc_ula           => hc,
+      o_vc_ula           => vc,
+      o_vc_cu            => cvc,
+      
+      o_whc              => whc,
+      o_wvc              => wvc,
+      
+      o_phc              => phc,
+      
+      -- 28 MHz domain
+      
+      o_sc               => sc,
+
+      i_inten_ula_n      => port_ff_interrupt_disable,
+      
+      i_inten_line       => nr_22_line_interrupt_en,
+      i_int_line         => nr_23_line_interrupt,
+      
+      -- 7 MHz domain
+      
+      o_int_ula          => ula_int_pulse,
+      o_int_line         => line_int_pulse
    );
 
    --
@@ -6787,6 +6816,7 @@ begin
          rgb_vblank_n_1 <= rgb_vblank_n;
          rgb_hblank_n_1 <= rgb_hblank_n;
          rgb_hsync_n_1 <= rgb_hsync_n;
+		 hdmi_pixel_en_1 <= hdmi_pixel_en;
       
       end if;
    end process;
@@ -6984,10 +7014,11 @@ begin
       
          layer_priorities_2 <= layer_priorities_1;
          
-         rgb_vsync_n_2 <= rgb_vsync_n_1;
-         rgb_vblank_n_2 <= rgb_vblank_n_1;
-         rgb_hblank_n_2 <= rgb_hblank_n_1;
-         rgb_hsync_n_2 <= rgb_hsync_n_1;
+         rgb_vsync_n_2   <= rgb_vsync_n_1;
+         rgb_vblank_n_2   <= rgb_vblank_n_1;
+			rgb_hblank_n_2   <= rgb_hblank_n_1;
+         rgb_hsync_n_2   <= rgb_hsync_n_1;
+		 hdmi_pixel_en_2 <= hdmi_pixel_en_1;
       
       end if;
    end process;
@@ -7293,29 +7324,33 @@ begin
          rgb_out_6 <= rgb_out_5;
          rgb_out_5 <= rgb_out_4;
          rgb_out_4 <= rgb_out_3;
-         rgb_out_3 <= rgb_out_2a;
+         rgb_out_3 <= rgb_out_2;
+         hdmi_pixel_en_6 <= hdmi_pixel_en_5;
+         hdmi_pixel_en_5 <= hdmi_pixel_en_4;
+         hdmi_pixel_en_4 <= hdmi_pixel_en_3;
+         hdmi_pixel_en_3 <= hdmi_pixel_en_2;
 
       end if;
    end process;
 
-   process (i_CLK_28)
+   process (i_CLK_14)
    begin
-      if falling_edge(i_CLK_28) then
+      if rising_edge(i_CLK_14) then
       
-         rgb_vsync_n_7 <= rgb_vsync_n_6;
-         rgb_vblank_n_7 <= rgb_vblank_n_6;
-         rgb_hblank_n_7 <= rgb_hblank_n_6;
-         rgb_hsync_n_7 <= rgb_hsync_n_6;
-         rgb_out_7 <= rgb_out_6;
-      
+         rgb_vsync_n_o <= rgb_vsync_n_6;
+         rgb_vblank_n_o  <= rgb_vblank_n_6;
+         rgb_hblank_n_o <= rgb_hblank_n_6;
+         rgb_hsync_n_o <= rgb_hsync_n_6;
+         rgb_csync_n_o <= rgb_vsync_n_6 and rgb_hsync_n_6;
+         if rgb_hblank_n_6 = '1' then
+            rgb_out_o  <= rgb_out_6;
+         else
+            rgb_out_o  <= (others => '0');
+         end if;
+         
+         hdmi_pixel_en_7 <= hdmi_pixel_en_6;
       end if;
    end process;
    
-   rgb_vsync_n_o <= rgb_vsync_n_7;
-   rgb_vblank_n_o <= rgb_vblank_n_7;
-   rgb_hblank_n_o <= rgb_hblank_n_7;
-   rgb_hsync_n_o <= rgb_hsync_n_7;
-   rgb_out_o <= rgb_out_7;
-   rgb_csync_n_o <= rgb_vsync_n_7 and rgb_hsync_n_7;
 
 end architecture;
