@@ -54,7 +54,7 @@ entity im2_peripheral is
       i_int_en                : in std_logic;    -- enable interrupts from this device
       i_int_req               : in std_logic;    -- interrupt request from this device (level active, must not persist through im2_isr_serviced signal)
       i_int_unq               : in std_logic;    -- unqualifed interrupt request from this device (enable not required)
-    
+   
       i_int_status_clear      : in std_logic;    -- clear interrupt status bit if 1 (i_CLK_28)
       o_int_status            : out std_logic;   -- current state of interrupt status bit (i_CLK_28)
 

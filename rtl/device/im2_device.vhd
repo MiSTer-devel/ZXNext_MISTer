@@ -56,13 +56,16 @@ entity im2_device is
       i_reset_n         : in std_logic;
       
       i_im2_mode        : in std_logic;   -- 1 if z80 is in im 2 mode (set 1 if unknown)
+      
       i_m1_n            : in std_logic;
       i_iorq_n          : in std_logic;
       
       i_int_req         : in std_logic;   -- peripheral wants to generate an interrupt, hold high
       o_int_n           : out std_logic;  -- interrupt signal for z80
+      
       i_dma_int_en      : in  std_logic;  -- enable dma interruption
       o_dma_int         : out std_logic;  -- interrupt dma operation
+      
       i_reti_decode     : in std_logic;
       i_reti_seen       : in std_logic;
       o_isr_serviced    : out std_logic;  -- when set, reset i_int_req on next rising edge of clock

@@ -34,10 +34,10 @@ entity membrane_stick is
 
       i_joy_en_n           : in std_logic;
 
-      i_joy_left           : in std_logic_vector(11 downto 0);
+      i_joy_left           : in std_logic_vector(11 downto 0);  -- active high  MODE X Z Y START A C B U D L R
       i_joy_left_type      : in std_logic_vector(2 downto 0);
 
-      i_joy_right          : in std_logic_vector(11 downto 0);
+      i_joy_right          : in std_logic_vector(11 downto 0);  -- active high  MODE X Z Y START A C B U D L R
       i_joy_right_type     : in std_logic_vector(2 downto 0);
 
       i_membrane_row       : in std_logic_vector(2 downto 0);
@@ -144,7 +144,7 @@ begin
          when others =>  -- MD Pad
             joy_addr_start <= "11000";
             joy_bit_count_start <= "1000";
-            joy_bit_count_end <= "1010";
+            joy_bit_count_end <= "1011";
       end case;
    end process;
    

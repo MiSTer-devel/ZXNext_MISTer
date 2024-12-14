@@ -88,7 +88,7 @@ begin
    page0 <= '1' when i_cpu_a_15_13 = "000" else '0';
    page1 <= '1' when i_cpu_a_15_13 = "001" else '0';
    
-    -- Issue #7 : Also bring in divmmc bank 3 as rom substitute when conmem is set
+   -- Issue #7 : Also bring in divmmc bank 3 as rom substitute when conmem is set
    -- This is a departure from the original divmmc hardware
    
    rom_en <= '1' when (page0 = '1' and (conmem = '1' or automap = '1') and mapram = '0') else '0';

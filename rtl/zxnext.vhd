@@ -31,15 +31,17 @@ use work.Z80N_pack.all;
 entity zxnext is
    generic
    (
-      g_machine_id         : unsigned(7 downto 0);
+      --g_machine_id         : unsigned(7 downto 0);
       g_video_def          : unsigned(2 downto 0);
       g_version            : unsigned(7 downto 0);
       g_sub_version        : unsigned(7 downto 0);
-      g_board_issue        : unsigned(3 downto 0);
+      --g_board_issue        : unsigned(3 downto 0);
       g_video_inc          : unsigned(1 downto 0)
    );
    port
    (
+      g_machine_id         : in unsigned(7 downto 0);
+	  g_board_issue        : in unsigned(3 downto 0);
       -- CLOCK
       
       i_CLK_28             : in std_logic;      -- 28MHz for machine logic
@@ -143,8 +145,8 @@ entity zxnext is
       o_RGB_CS_n           : out std_logic;                       -- csync
       o_RGB_VS_n           : out std_logic;                       -- vsync
       o_RGB_HS_n           : out std_logic;                       -- hsync
-      o_RGB_VB_n           : out std_logic;                       -- vblank
-      o_RGB_HB_n           : out std_logic;                       -- hblank
+      o_RGB_VB_n           : out std_logic;                       -- vblank spilt for mister
+      o_RGB_HB_n           : out std_logic;                       -- hblank split for mister
       
       o_VIDEO_50_60        : out std_logic;                       -- 0 = 50Hz, 1 = 60Hz
       o_VIDEO_SCANLINES    : out std_logic_vector(1 downto 0);    -- 
@@ -186,7 +188,7 @@ entity zxnext is
       o_RAM_A_DO           : out std_logic_vector(7 downto 0);    -- data written to memory
       o_RAM_A_CYCLE          : out std_logic;   
 	  o_RAM_A_RFSH         : out std_logic;
-      i_CPU_WAIT           : in std_logic := '1';  -- no seguro si lo usa 0 o 1 
+      i_CPU_WAIT           : in std_logic := '1';
       
       -- Port B is read only (LAYER 2)
       
@@ -1343,7 +1345,7 @@ architecture rtl of zxnext is
    signal vram_bank7_do          : std_logic_vector(7 downto 0);
    
    signal video_timing_change    : std_logic;
-   signal video_timing_change_d  : std_logic := '0';
+   signal video_timing_change_d  : std_logic := '1';
    signal video_frame_sync       : std_logic;
    
    signal eff_nr_03_machine_timing           : std_logic_vector(2 downto 0) := "011";
@@ -1773,7 +1775,7 @@ begin
 
    expbus_disable_int <= '1' when expbus_eff_en = '0' or expbus_eff_disable_io = '1' or nr_c4_int_en_0_expbus = '0' else '0';
 
-   z80_wait_n <= '0' when (ula_wait_n = '0') or (ulap_wait_n = '0') or (sram_wait_n = '0') or (i_BUS_WAIT_n = '0' and expbus_eff_en = '1') or (i_CPU_WAIT = '1') else '1';  ---no seguro si aplic
+   z80_wait_n <= '0' when (ula_wait_n = '0') or (ulap_wait_n = '0') or (sram_wait_n = '0') or (i_BUS_WAIT_n = '0' and expbus_eff_en = '1') or (i_CPU_WAIT = '1') else '1';
    z80_int_n <= ((pulse_int_n and im2_int_n) or not expbus_disable_int) and (i_BUS_INT_n or expbus_disable_int);
    z80_nmi_n <= nmi_generate_n;
    z80_busrq_n <= dma_busrq_n;
@@ -3241,7 +3243,7 @@ begin
                pi_spi0_miso     when spi_ss_rpi1_n = '0' or spi_ss_rpi0_n = '0' else
                i_SPI_SD_MISO    when spi_ss_sd1_n = '0' or spi_ss_sd0_n = '0' else '1';
 
-   spi_master_mod: entity work.spi_master
+   spi_master_mod: entity work.spi_master   --not changed for 3.02 . not needed in mister the changes
    port map (
       clock_i        => i_CLK_CPU,
       reset_i        => '0',           -- hard_reset done through core load
@@ -6658,8 +6660,8 @@ begin
       i_CLK_7            => i_CLK_7,
 
       --o_blank_n          => rgb_blank_n,
-      o_hblank_n     => rgb_hblank_n,-- do not mix hblank y vblank
-      o_vblank_n     => rgb_vblank_n,-- do not mix hblank y vblank
+      o_hblank_n     => rgb_hblank_n,-- split hblank y vblank for mister
+      o_vblank_n     => rgb_vblank_n,-- split hblank y vblank for mister
       o_hsync_n          => rgb_hsync_n,
       o_vsync_n          => rgb_vsync_n,
       o_frame_sync       => video_frame_sync,
@@ -7016,7 +7018,7 @@ begin
          
          rgb_vsync_n_2   <= rgb_vsync_n_1;
          rgb_vblank_n_2   <= rgb_vblank_n_1;
-			rgb_hblank_n_2   <= rgb_hblank_n_1;
+		 rgb_hblank_n_2   <= rgb_hblank_n_1;
          rgb_hsync_n_2   <= rgb_hsync_n_1;
 		 hdmi_pixel_en_2 <= hdmi_pixel_en_1;
       
@@ -7324,7 +7326,7 @@ begin
          rgb_out_6 <= rgb_out_5;
          rgb_out_5 <= rgb_out_4;
          rgb_out_4 <= rgb_out_3;
-         rgb_out_3 <= rgb_out_2;
+         rgb_out_3 <= rgb_out_2a;
          hdmi_pixel_en_6 <= hdmi_pixel_en_5;
          hdmi_pixel_en_5 <= hdmi_pixel_en_4;
          hdmi_pixel_en_4 <= hdmi_pixel_en_3;

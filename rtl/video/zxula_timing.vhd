@@ -48,8 +48,8 @@ entity zxula_timing is
    
       i_CLK_7            : in std_logic;
 
-      o_vblank_n         : out std_logic;--separo vblack y hblank
-	   o_hblank_n         : out std_logic;--separo vblank y hblank 
+      o_vblank_n         : out std_logic;--split vblack y hblank
+	   o_hblank_n         : out std_logic;--split vblank y hblank 
       o_hsync_n          : out std_logic;
       o_vsync_n          : out std_logic;
       o_frame_sync       : out std_logic;
@@ -158,7 +158,7 @@ begin
          c_min_hsync   <= to_unsigned(16, 9);       -- displays don't like hsync = hblank
          c_max_hsync   <= to_unsigned(47, 9);
          c_max_hblank  <= to_unsigned(63, 9);
-         c_min_hactive <= to_unsigned(128, 9);      -- 256x192 area
+         c_min_hactive <= to_unsigned(128 +12, 9);      -- 256x192 area  --center area in mister
          c_max_hc      <= to_unsigned(447, 9);
          
          c_min_vblank  <= to_unsigned(0, 9);
@@ -194,7 +194,7 @@ begin
             c_min_hsync   <= to_unsigned(16, 9);
             c_max_hsync   <= to_unsigned(47, 9);
             c_max_hblank  <= to_unsigned(95, 9);
-            c_min_hactive <= to_unsigned(136, 9);   -- 256x192 area
+            c_min_hactive <= to_unsigned(136 + 12, 9);   -- 256x192 area  --center area in mister
             c_max_hc      <= to_unsigned(455, 9);
          
             c_min_vblank  <= to_unsigned(0, 9);
@@ -228,7 +228,7 @@ begin
             c_min_hsync   <= to_unsigned(16, 9);
             c_max_hsync   <= to_unsigned(47, 9);
             c_max_hblank  <= to_unsigned(95, 9);
-            c_min_hactive <= to_unsigned(136, 9);   -- 256x192 area
+            c_min_hactive <= to_unsigned(136 + 12, 9);   -- 256x192 area  --center area in mister
             c_max_hc      <= to_unsigned(455, 9);
          
             c_min_vblank  <= to_unsigned(0, 9);
@@ -260,7 +260,7 @@ begin
             c_min_hsync   <= to_unsigned(16, 9);
             c_max_hsync   <= to_unsigned(47, 9);
             c_max_hblank  <= to_unsigned(95, 9);
-            c_min_hactive <= to_unsigned(128, 9);   -- 256x192 area
+            c_min_hactive <= to_unsigned(128 +12, 9);   -- 256x192 area  --center area in mister
             c_max_hc      <= to_unsigned(447, 9);
          
             c_min_vblank  <= to_unsigned(0, 9);
@@ -288,7 +288,7 @@ begin
             c_min_hsync   <= to_unsigned(16, 9);
             c_max_hsync   <= to_unsigned(47, 9);
             c_max_hblank  <= to_unsigned(95, 9);
-            c_min_hactive <= to_unsigned(128, 9);   -- 256x192 area
+            c_min_hactive <= to_unsigned(128 + 12, 9);   -- 256x192 area  --center area in mister
             c_max_hc      <= to_unsigned(447, 9);
          
             c_min_vblank  <= to_unsigned(0, 9);
@@ -410,7 +410,7 @@ begin
       end if;
    end process;
    
-   --o_hdmi_pixel_en <= hdmi_pixel_en;
+   o_hdmi_pixel_en <= hdmi_pixel_en;
    
    process (i_CLK_7)
    begin
@@ -423,7 +423,7 @@ begin
       end if;
    end process;
    
-  -- o_hdmi_frame_lock <= hdmi_frame_lock;
+   o_hdmi_frame_lock <= hdmi_frame_lock;
 
    -- pixel counters
    

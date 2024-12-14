@@ -18,6 +18,9 @@
 -- along with the ZX Spectrum Next FPGA source code.  If not, see 
 -- <https://www.gnu.org/licenses/>.
 
+-- Spartan S6
+-- 128Mbit flash chip operated in standard 24-bit spi mode
+
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;

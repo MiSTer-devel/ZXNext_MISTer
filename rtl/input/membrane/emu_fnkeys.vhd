@@ -58,7 +58,6 @@ architecture rtl of emu_fnkeys is
    signal timer_set        : std_logic;
    signal timer_expired    : std_logic;
    
-   
    type state_t is (S_IDLE, S_MF_ROW_A11, S_MF_ROW_A12, S_MF_CHECK, S_MF_DONE, S_RESET_CHECK, S_RESET_DONE);
    
    signal state            : state_t;
@@ -97,7 +96,6 @@ begin
       end if;
    end process;
    
- 
    --
    -- state machine
    --

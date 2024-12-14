@@ -40,14 +40,13 @@ entity peripherals is
       
       i_m1_n               : in std_logic;
       i_iorq_n             : in std_logic;
-	  
+      
       i_im2_mode           : in std_logic;
       i_mode_pulse_0_im2_1 : in std_logic;
 
       i_int_en             : in std_logic_vector(NUM_PERIPH downto 1);
       i_int_req            : in std_logic_vector(NUM_PERIPH downto 1);
       i_int_unq            : in std_logic_vector(NUM_PERIPH downto 1);
-
       
       o_int_status         : out std_logic_vector(NUM_PERIPH downto 1);
       i_int_status_clear   : in std_logic_vector(NUM_PERIPH downto 1);
@@ -91,7 +90,6 @@ begin
       generic map (
          VEC_BITS                => VEC_BITS,
          EXCEPTION               => EXCEPTION(I)
-
       )
       port map (
          i_CLK_28                => i_CLK_28,
@@ -100,7 +98,7 @@ begin
       
          i_m1_n                  => i_m1_n,
          i_iorq_n                => i_iorq_n,
-      
+         
          i_im2_mode              => i_im2_mode,
          i_mode_pulse_0_im2_1    => i_mode_pulse_0_im2_1,
       
@@ -113,7 +111,7 @@ begin
          i_int_en                => i_int_en(I),
          i_int_req               => i_int_req(I),
          i_int_unq               => i_int_unq(I),
-
+   
          i_int_status_clear      => i_int_status_clear(I),
          o_int_status            => o_int_status(I),
 
