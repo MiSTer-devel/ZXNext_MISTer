@@ -45,7 +45,7 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 use ieee.std_logic_unsigned.all;
 
-entity i2s_transmitter is
+entity i2s_transmiter is
    port
    (
       i_reset        : in std_logic;
@@ -80,7 +80,7 @@ entity i2s_transmitter is
    );
 end entity;
 
-architecture rtl of i2s_transmitter is
+architecture rtl of i2s_transmiter is
 
    signal i2s_sck       : std_logic;
    signal i2s_ws        : std_logic;

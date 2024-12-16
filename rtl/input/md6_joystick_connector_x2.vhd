@@ -1,6 +1,6 @@
 
 -- Sega Mega Drive Pads x 2
--- Copyright 2020 Victor Trucco and Alvin Albrecht
+-- Copyright 2020, 2022 Victor Trucco and Alvin Albrecht
 --
 -- This file is part of the ZX Spectrum Next Project
 -- <https://gitlab.com/SpectrumNext/ZX_Spectrum_Next_FPGA/tree/master/cores>
@@ -45,8 +45,8 @@ entity md6_joystick_connector_x2 is
       o_joy_7        : out std_logic;
       o_joy_select   : out std_logic;   -- 0 = left connector, 1 = right connector
 
-      o_joy_left     : out std_logic_vector(10 downto 0);   -- active high  X Z Y START A C B U D L R
-      o_joy_right    : out std_logic_vector(10 downto 0)    -- active high  X Z Y START A C B U D L R
+      o_joy_left     : out std_logic_vector(11 downto 0);   -- active high  MODE X Z Y START A C B U D L R
+      o_joy_right    : out std_logic_vector(11 downto 0)    -- active high  MODE X Z Y START A C B U D L R
    );
 end entity;
 
@@ -75,10 +75,10 @@ architecture rtl of md6_joystick_connector_x2 is
    signal state_rest : std_logic;
    
    signal joy_left_six_button_n     : std_logic;
-   signal joy_left_n                : std_logic_vector(10 downto 0);
+   signal joy_left_n                : std_logic_vector(11 downto 0);
    
    signal joy_right_six_button_n    : std_logic;
-   signal joy_right_n               : std_logic_vector(10 downto 0);
+   signal joy_right_n               : std_logic_vector(11 downto 0);
    
    signal joy_raw                   : std_logic_vector(5 downto 0);
    
@@ -162,12 +162,12 @@ begin
                
                when "101" & '0' =>
                   if joy_left_six_button_n = '0' then
-                     joy_left_n(10 downto 8) <= i_joy_3_n & i_joy_1_n & i_joy_2_n;
+                     joy_left_n(11 downto 8) <= i_joy_4_n & i_joy_3_n & i_joy_1_n & i_joy_2_n;
                   end if;
                
                when "101" & '1' =>
                   if joy_right_six_button_n = '0' then
-                     joy_right_n(10 downto 8) <= i_joy_3_n & i_joy_1_n & i_joy_2_n;
+                     joy_right_n(11 downto 8) <= i_joy_4_n & i_joy_3_n & i_joy_1_n & i_joy_2_n;
                   end if;
                   
                when others => null;
@@ -185,9 +185,9 @@ begin
             o_joy_left <= (others => '0');
             o_joy_right <= (others => '0');
          elsif io_mode = '1' and state(1 downto 0) = "01" then
-            o_joy_left <= "00000" & not joy_raw;
+            o_joy_left <= "000000" & not joy_raw;
          elsif io_mode = '1' and state(1 downto 0) = "11" then
-            o_joy_right <= "00000" & not joy_raw;
+            o_joy_right <= "000000" & not joy_raw;
          elsif io_mode = '0' and state_rest = '1' then
             o_joy_left <= not joy_left_n;
             o_joy_right <= not joy_right_n;

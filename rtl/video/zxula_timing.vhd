@@ -1,8 +1,13 @@
-
 -- ZX Spectrum Next Video Timing Module
 --
--- Copyright 2017 superfo, mcleod, avillena (ZX UNO Project) 
--- Copyright 2020 Fabio Belavenuto, Alvin Albrecht
+-- Copyright 2023 Alvin Albrecht, Fabio Belavenuto
+--
+-- References:
+-- 1 "The ZX Spectrum ULA: How to Design a Microcomputer", ISBN-13 978-0-9565071-0-5, (c) 2010 Chris Smith
+-- 2 http://sblive.narod.ru/ZX-Spectrum/Pentagon128k/Pentagon128k.htm by Z.A.N.
+--
+-- Older versions of this module borrowed from the ZX UNO project:
+-- <https://github.com/yomboprime/zxuno-addons/blob/master/test24_uart/common/pal_sync_generator.v>
 --
 -- This file is part of the ZX Spectrum Next Project
 -- <https://gitlab.com/SpectrumNext/ZX_Spectrum_Next_FPGA/tree/master/cores>
@@ -22,450 +27,570 @@
 -- <https://www.gnu.org/licenses/>.
 --
 
--- Original pal_sync_generator.v from the ZX UNO project:
--- <https://github.com/yomboprime/zxuno-addons/blob/master/test24_uart/common/pal_sync_generator.v>
-
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.std_logic_unsigned.all;
 use ieee.numeric_std.all;
 
 entity zxula_timing is
-   port (
-      clock_i        : in  std_logic;
-      clock_x4_i     : in  std_logic;
-      reset_conter_i : in  std_logic;
-      mode_i         : in  std_logic_vector(2 downto 0);
-      video_timing_i : in  std_logic_vector(2 downto 0);
-      vf50_60_i      : in  std_logic;
-      cu_offset_i    : in  std_logic_vector(7 downto 0);
-      hcount_o       : out unsigned(8 downto 0);
-      vcount_o       : out unsigned(8 downto 0);
-      phcount_o      : out unsigned(8 downto 0);
-      whcount_o      : out unsigned(8 downto 0);
-      wvcount_o      : out unsigned(8 downto 0);
-      cvcount_o      : out unsigned(8 downto 0);
-      sc_o           : out std_logic_vector(1 downto 0);
-      hsync_n_o      : out std_logic;
-      vsync_n_o      : out std_logic;
-      hblank_n_o     : out std_logic;
-      vblank_n_o     : out std_logic;
-      lint_ctrl_i    : in  std_logic_vector(1 downto 0);
-      lint_line_i    : in  std_logic_vector(8 downto 0);
-      ula_int_o      : out std_logic;
-      line_int_o     : out std_logic
+   port
+   (
+      -- 28 MHz domain
+      
+      i_CLK_28           : in std_logic;
+      
+      i_50_60            : in std_logic;                      -- 0 = 50 Hz, 1 = 60 Hz
+      i_timing           : in std_logic_vector(2 downto 0);   -- 1XX = pentagon, 010 = 128K, 011 = +3, else 48K
+      
+      i_cu_offset        : in std_logic_vector(7 downto 0);   -- offset applied to ula vertical pixel count for copper and line int
+      
+      -- 7 MHz doman
+   
+      i_CLK_7            : in std_logic;
+
+      o_vblank_n         : out std_logic;--split vblack y hblank
+	   o_hblank_n         : out std_logic;--split vblank y hblank 
+      o_hsync_n          : out std_logic;
+      o_vsync_n          : out std_logic;
+      o_frame_sync       : out std_logic;
+      
+      o_hdmi_pixel_en    : out std_logic;                     -- pixel available for hdmi
+      o_hdmi_frame_lock  : out std_logic;                     -- first pixel of hdmi frame should not be emitted before this time
+      
+      o_hc_ula           : out unsigned(8 downto 0);          -- ula horizontal count
+      o_vc_ula           : out unsigned(8 downto 0);          -- ula vertical count
+      o_vc_cu            : out unsigned(8 downto 0);          -- copper offsetted vertical count
+      
+      o_whc              : out unsigned(8 downto 0);          -- wide horizontal count for 320x256
+      o_wvc              : out unsigned(8 downto 0);          -- wide vertical count for 320x256
+      
+      o_phc              : out unsigned(8 downto 0);          -- practical horizontal count for 256x192
+      
+      -- 28 MHz domain
+      
+      o_sc               : out std_logic_vector(1 downto 0);  -- 28 MHz sub pixel counter (four per pixel)
+
+      i_inten_ula_n      : in std_logic;
+      
+      i_inten_line       : in std_logic;
+      i_int_line         : in std_logic_vector(8 downto 0);
+      
+      -- 7 MHz domain
+      
+      o_int_ula          : out std_logic;                     -- 7 MHz pulse
+      o_int_line         : out std_logic                      -- 7 MHz pulse
    );
 end entity;
 
-architecture Behavior of zxula_timing is
+architecture rtl of zxula_timing is
 
-   signal hc_s                   : unsigned(8 downto 0);
-   signal vc_s                   : unsigned(8 downto 0);
-   signal phc_s                  : unsigned(8 downto 0);
-   signal whc_s                  : unsigned(8 downto 0);
-   signal wvc_s                  : unsigned(8 downto 0);
-   signal cvc_s                  : unsigned(8 downto 0);
-   signal whc_lsb_d              : std_logic;
-   signal sc_s                   : std_logic_vector(1 downto 0);
+   signal c_min_hblank         : unsigned(8 downto 0);
+   signal c_min_hsync          : unsigned(8 downto 0);
+   signal c_max_hsync          : unsigned(8 downto 0);
+   signal c_max_hblank         : unsigned(8 downto 0);
+   signal c_min_hactive        : unsigned(8 downto 0);
+   signal c_max_hc             : unsigned(8 downto 0);
    
-   signal max_hc_s               : std_logic;
-   signal max_vc_s               : std_logic;
-   signal max_cvc_s              : std_logic;
-   signal max_whc_s              : std_logic;
+   signal c_min_vblank         : unsigned(8 downto 0);
+   signal c_min_vsync          : unsigned(8 downto 0);
+   signal c_max_vsync          : unsigned(8 downto 0);
+   signal c_max_vblank         : unsigned(8 downto 0);
+   signal c_min_vactive        : unsigned(8 downto 0);
+   signal c_max_vc             : unsigned(8 downto 0);
    
-   signal int_ula_s              : std_logic;
-   signal int_lint_s             : std_logic;
+   signal c_int_h              : unsigned(8 downto 0);
+   signal c_int_v              : unsigned(8 downto 0);
+   
+   signal c_hdmi_xmin          : unsigned(8 downto 0);
+   signal c_hdmi_xmax          : unsigned(8 downto 0);
+   signal c_hdmi_ymin          : unsigned(8 downto 0);
+   signal c_hdmi_ymax          : unsigned(8 downto 0);
+   signal c_hdmi_ysync         : unsigned(8 downto 0);
+   
+   signal max_hc               : std_logic;
+   signal max_vc               : std_logic;
+   signal hc                   : unsigned(8 downto 0) := (others => '0');
+   signal vc                   : unsigned(8 downto 0) := (others => '0');
 
-   signal c_max_hc_s             : unsigned(8 downto 0);
-   signal c_max_vc_s             : unsigned(8 downto 0);
-   signal c_vblank_min_s         : unsigned(8 downto 0);
-   signal c_vblank_max_s         : unsigned(8 downto 0);
-   signal c_hblank_min_s         : unsigned(8 downto 0);
-   signal c_hblank_max_s         : unsigned(8 downto 0);
-   signal c_vsync_min_s          : unsigned(8 downto 0);
-   signal c_vsync_max_s          : unsigned(8 downto 0);
-   signal c_hsync_min_s          : unsigned(8 downto 0);
-   signal c_hsync_max_s          : unsigned(8 downto 0);
-   signal c_int_h_s              : unsigned(8 downto 0);
-   signal c_int_v_s              : unsigned(8 downto 0);
+   signal vblank_n             : std_logic := '0';
+   signal hblank_n             : std_logic := '0';
+   signal hsync_n              : std_logic := '1';
+   signal vsync_n              : std_logic := '1';
+   signal frame_sync           : std_logic := '0';
+   signal hdmi_pixel_en        : std_logic := '0';
+   signal hdmi_frame_lock      : std_logic := '0';
    
-   signal vblank_top_cancel      : std_logic;
-   signal vblank_bottom_cancel   : std_logic;
-
+   signal ula_min_hactive      : unsigned(8 downto 0);
+   signal ula_min_vactive      : std_logic;
+   signal ula_max_hc           : std_logic;
+   signal hc_ula               : unsigned(8 downto 0) := to_unsigned(256, 9);
+   signal vc_ula               : unsigned(8 downto 0) := (others => '0');
+   signal cvc                  : unsigned(8 downto 0) := (others => '0');
+   
+   signal wide_min_hactive     : unsigned(8 downto 0);
+   signal wide_min_vactive     : unsigned(8 downto 0);
+   signal wide_hactive         : std_logic;
+   signal whc                  : unsigned(8 downto 0) := to_unsigned(320, 9);
+   signal wvc                  : unsigned(8 downto 0) := (others => '0');
+   
+   signal phc                  : unsigned(8 downto 0) := to_unsigned(256, 9);
+   
+   signal whc_0_d              : std_logic := '0';
+   signal sc                   : std_logic_vector(1 downto 0) := (others => '0');
+   
+   signal int_ula              : std_logic := '0';
+   signal int_line             : std_logic := '0';
+   signal int_line_num         : unsigned(8 downto 0) := (others => '0');
+   
 begin
 
-   --
-   process (mode_i, vf50_60_i, video_timing_i)
+   -- display dimensions
+
+   process (i_timing, i_50_60)
    begin
-      -- Modeline "720x576x50hz"    27       720   732   796   864      576   581   586   625 
-      --                                     360   366   398   432      288   290   293   312
-      -- ModeLine "720x480@60"      27       720   736   798   858      480   489   495   525 
-      --                                     360   368   399   429      240   244   247   262
-      if video_timing_i = "111" then
-      
-         -- HDMI
-         
-         -- Investigate later.. these numbers were chosen to agree with most hdmi tvs.
-         
-         if vf50_60_i = '0' then
-         
-            -- 50 Hz
-            
-            c_hblank_min_s <= to_unsigned(360-37, 9); -- -37 ok
-            c_hsync_min_s  <= to_unsigned(366-37, 9);
-            c_hsync_max_s  <= to_unsigned(398-37, 9);
-            c_hblank_max_s <= to_unsigned(431-37, 9);
-            c_int_h_s      <= to_unsigned(4, 9);
-            c_max_hc_s     <= to_unsigned(431, 9);
-
-            c_vblank_min_s <= to_unsigned(248+8-1, 9);-- +8 ok
-            c_vsync_min_s  <= to_unsigned(248+8, 9);
-            c_vsync_max_s  <= to_unsigned(251+8, 9);
-            c_vblank_max_s <= to_unsigned(255+8, 9);
-            c_int_v_s      <= to_unsigned(248+8, 9);                                   
-            c_max_vc_s     <= to_unsigned(311, 9);
-            
-         else
-         
-            -- 60 Hz
-            
-            c_hblank_min_s <= to_unsigned(360-37, 9); -- -37 ok
-
-            c_hsync_min_s  <= to_unsigned(368-37, 9);
-            c_hsync_max_s  <= to_unsigned(399-37, 9);
-            c_hblank_max_s <= to_unsigned(428-37, 9);
-            c_int_h_s      <= to_unsigned(4, 9);                        
-            c_max_hc_s     <= to_unsigned(428, 9);
-
-            c_vblank_min_s <= to_unsigned(240-9-1, 9); -- -9 ok
-            c_vsync_min_s  <= to_unsigned(244-9, 9);
-            c_vsync_max_s  <= to_unsigned(247-9, 9);
-            c_vblank_max_s <= to_unsigned(247-9, 9);
-            c_int_v_s      <= to_unsigned(244-9, 9);                                      
-            c_max_vc_s     <= to_unsigned(261, 9);
-            
-         end if;
-         
-      elsif mode_i = "000" or mode_i = "001" then
-      
-         -- 48k
-         
-         c_hblank_min_s <= to_unsigned(320, 9);
-         c_hsync_min_s  <= to_unsigned(344, 9);
-         c_hsync_max_s  <= to_unsigned(375, 9);
-         c_hblank_max_s <= to_unsigned(415, 9);
-         c_int_h_s      <= to_unsigned(0, 9);
-         c_max_hc_s     <= to_unsigned(447, 9);
-         
-         if vf50_60_i = '0' then
-         
-            -- 50 Hz
-            
-            c_vblank_min_s <= to_unsigned(248-1, 9);
-            c_vblank_max_s <= to_unsigned(255, 9);
-            c_vsync_min_s  <= to_unsigned(248, 9);
-            c_vsync_max_s  <= to_unsigned(251, 9);
-            c_int_v_s      <= to_unsigned(248, 9);
-            c_max_vc_s     <= to_unsigned(311, 9);
-            
-         else
-         
-            -- 60 Hz
-            
-            c_vblank_min_s <= to_unsigned(224-1, 9);
-            c_vsync_min_s  <= to_unsigned(224, 9);
-            c_vsync_max_s  <= to_unsigned(227, 9);
-            c_vblank_max_s <= to_unsigned(231, 9);
-            c_int_v_s      <= to_unsigned(224, 9);
-            c_max_vc_s     <= to_unsigned(263, 9);
-            
-         end if;
-
-      elsif mode_i = "010" or mode_i = "011" then
-      
-         -- 128k, +3
-         
-         c_hblank_min_s <= to_unsigned(320, 9);
-         c_hsync_min_s  <= to_unsigned(344, 9);
-         c_hsync_max_s  <= to_unsigned(375, 9);
-         c_hblank_max_s <= to_unsigned(415, 9);
-         
-         if mode_i = "010" then
-         
-            -- 128k
-            
-            c_int_h_s   <= to_unsigned(4, 9);  -- 8
-         
-         else
-         
-            -- +3
-
-            c_int_h_s   <= to_unsigned(2, 9);
-            
-         end if;
-         
-         c_max_hc_s     <= to_unsigned(455, 9);
-         
-         if vf50_60_i = '0' then
-         
-            -- 50 Hz
-            
-            c_vblank_min_s <= to_unsigned(248-1, 9);
-            c_vsync_min_s  <= to_unsigned(248, 9);
-            c_vsync_max_s  <= to_unsigned(251, 9);
-            c_vblank_max_s <= to_unsigned(255, 9);
-            c_int_v_s      <= to_unsigned(248, 9);
-            c_max_vc_s     <= to_unsigned(310, 9);
-            
-         else
-         
-            -- 60 Hz
-
-            c_vblank_min_s <= to_unsigned(224-1, 9);
-            c_vsync_min_s  <= to_unsigned(224, 9);
-            c_vsync_max_s  <= to_unsigned(227, 9);
-            c_vblank_max_s <= to_unsigned(231, 9);
-            c_int_v_s      <= to_unsigned(224, 9);
-            c_max_vc_s     <= to_unsigned(263, 9);
-            
-         end if;     
-         
-      else
+   
+      if i_timing(2) = '1' then
       
          -- Pentagon
+         
+         c_min_hblank  <= to_unsigned(0, 9);
+         c_int_h       <= to_unsigned(448+3-12, 9); -- 3 (0)
+         c_min_hsync   <= to_unsigned(16, 9);       -- displays don't like hsync = hblank
+         c_max_hsync   <= to_unsigned(47, 9);
+         c_max_hblank  <= to_unsigned(63, 9);
+         c_min_hactive <= to_unsigned(128 +12, 9);      -- 256x192 area  --center area in mister
+         c_max_hc      <= to_unsigned(447, 9);
+         
+         c_min_vblank  <= to_unsigned(0, 9);
+         c_int_v       <= to_unsigned(319, 9);      -- (0)
+         c_min_vsync   <= to_unsigned(1, 9);        -- displays don't like vsync = vblank
+         c_max_vsync   <= to_unsigned(14, 9);
+         c_max_vblank  <= to_unsigned(15, 9);
+         c_min_vactive <= to_unsigned(80, 9);       -- 256x192 area
+         c_max_vc      <= to_unsigned(319, 9);
+         
+         -- hdmi 360x288
+         
+         c_hdmi_xmin   <= to_unsigned(76, 9);
+         c_hdmi_xmax   <= to_unsigned(435, 9);
+         c_hdmi_ymin   <= to_unsigned(24, 9);
+         c_hdmi_ymax   <= to_unsigned(311, 9);
+         c_hdmi_ysync  <= to_unsigned(24+0, 9);
+         
+      elsif i_timing(1) = '1' then
       
-         c_hblank_min_s <= to_unsigned(336, 9);   -- 336, 320
-         c_hsync_min_s  <= to_unsigned(336, 9);   -- 336, 320
-         c_hsync_max_s  <= to_unsigned(367, 9);   -- 367, 351
-         c_hblank_max_s <= to_unsigned(399, 9);   -- 399, 383
-         c_int_h_s      <= to_unsigned(323, 9);   -- 323, 320
-         c_max_hc_s     <= to_unsigned(447, 9);   -- 447, 447
-
-         -- There is no 60Hz Pentagon
+         if i_50_60 = '0' then
+         
+            -- 128K 50 Hz
             
-         c_vblank_min_s <= to_unsigned(240-1, 9);
-         c_vsync_min_s  <= to_unsigned(240, 9);
-         c_vsync_max_s  <= to_unsigned(255, 9);
-         c_vblank_max_s <= to_unsigned(256, 9);    -- 271
-         c_int_v_s      <= to_unsigned(239, 9);    -- 240, 239
-         c_max_vc_s     <= to_unsigned(319, 9);
+            c_min_hblank  <= to_unsigned(0, 9);
+            
+            if i_timing(0) = '0' then
+               c_int_h    <= to_unsigned(136+4-12, 9);   -- 128K
+            else
+               c_int_h    <= to_unsigned(136+2-12, 9);   -- +3
+            end if;
+            
+            c_min_hsync   <= to_unsigned(16, 9);
+            c_max_hsync   <= to_unsigned(47, 9);
+            c_max_hblank  <= to_unsigned(95, 9);
+            c_min_hactive <= to_unsigned(136 + 12, 9);   -- 256x192 area  --center area in mister
+            c_max_hc      <= to_unsigned(455, 9);
+         
+            c_min_vblank  <= to_unsigned(0, 9);
+            c_int_v       <= to_unsigned(1, 9);
+            c_min_vsync   <= to_unsigned(1, 9);     -- displays don't like vsync = vblank
+            c_max_vsync   <= to_unsigned(4, 9);
+            c_max_vblank  <= to_unsigned(7, 9);
+            c_min_vactive <= to_unsigned(64, 9);    -- 256x192 area
+            c_max_vc      <= to_unsigned(310, 9);
+         
+            -- hdmi 360x288
+         
+            c_hdmi_xmin   <= to_unsigned(88, 9);
+            c_hdmi_xmax   <= to_unsigned(447, 9);
+            c_hdmi_ymin   <= to_unsigned(16, 9);
+            c_hdmi_ymax   <= to_unsigned(303, 9);
+            c_hdmi_ysync  <= to_unsigned(16+4, 9);
+            
+         else
+         
+            -- 128K 60 Hz
+         
+            c_min_hblank  <= to_unsigned(0, 9);
+            
+            if i_timing(0) = '0' then
+               c_int_h    <= to_unsigned(136+4-12, 9);   -- 128K
+            else
+               c_int_h    <= to_unsigned(136+2-12, 9);   -- +3
+            end if;
+            
+            c_min_hsync   <= to_unsigned(16, 9);
+            c_max_hsync   <= to_unsigned(47, 9);
+            c_max_hblank  <= to_unsigned(95, 9);
+            c_min_hactive <= to_unsigned(136 + 12, 9);   -- 256x192 area  --center area in mister
+            c_max_hc      <= to_unsigned(455, 9);
+         
+            c_min_vblank  <= to_unsigned(0, 9);
+            c_int_v       <= to_unsigned(0, 9);
+            c_min_vsync   <= to_unsigned(1, 9);     -- displays don't like vsync = vblank
+            c_max_vsync   <= to_unsigned(4, 9);
+            c_max_vblank  <= to_unsigned(7, 9);
+            c_min_vactive <= to_unsigned(40, 9);    -- 256x192 area
+            c_max_vc      <= to_unsigned(263, 9);
+            
+            -- hdmi 360x240
+         
+            c_hdmi_xmin   <= to_unsigned(88, 9);
+            c_hdmi_xmax   <= to_unsigned(447, 9);
+            c_hdmi_ymin   <= to_unsigned(16, 9);
+            c_hdmi_ymax   <= to_unsigned(255, 9);
+            c_hdmi_ysync  <= to_unsigned(16+0, 9);
+            
+         end if;
+
+      else
+
+         if i_50_60 = '0' then
+         
+            -- 48K 50 Hz
+            
+            c_min_hblank  <= to_unsigned(0, 9);
+            c_int_h       <= to_unsigned(128+0-12, 9);
+            c_min_hsync   <= to_unsigned(16, 9);
+            c_max_hsync   <= to_unsigned(47, 9);
+            c_max_hblank  <= to_unsigned(95, 9);
+            c_min_hactive <= to_unsigned(128 +12, 9);   -- 256x192 area  --center area in mister
+            c_max_hc      <= to_unsigned(447, 9);
+         
+            c_min_vblank  <= to_unsigned(0, 9);
+            c_int_v       <= to_unsigned(0, 9);
+            c_min_vsync   <= to_unsigned(1, 9);     -- displays don't like vsync = vblank
+            c_max_vsync   <= to_unsigned(4, 9);
+            c_max_vblank  <= to_unsigned(7, 9);
+            c_min_vactive <= to_unsigned(64, 9);    -- 256x192 area
+            c_max_vc      <= to_unsigned(311, 9);
+         
+            -- hdmi 360x288
+         
+            c_hdmi_xmin   <= to_unsigned(80, 9);
+            c_hdmi_xmax   <= to_unsigned(439, 9);
+            c_hdmi_ymin   <= to_unsigned(16, 9);
+            c_hdmi_ymax   <= to_unsigned(303, 9);
+            c_hdmi_ysync  <= to_unsigned(16+4, 9);
+         
+         else
+         
+            -- 48K 60 Hz
+
+            c_min_hblank  <= to_unsigned(0, 9);
+            c_int_h       <= to_unsigned(128+0-12, 9);
+            c_min_hsync   <= to_unsigned(16, 9);
+            c_max_hsync   <= to_unsigned(47, 9);
+            c_max_hblank  <= to_unsigned(95, 9);
+            c_min_hactive <= to_unsigned(128 + 12, 9);   -- 256x192 area  --center area in mister
+            c_max_hc      <= to_unsigned(447, 9);
+         
+            c_min_vblank  <= to_unsigned(0, 9);
+            c_int_v       <= to_unsigned(0, 9);
+            c_min_vsync   <= to_unsigned(1, 9);     -- displays don't like vsync = vblank
+            c_max_vsync   <= to_unsigned(4, 9);
+            c_max_vblank  <= to_unsigned(7, 9);
+            c_min_vactive <= to_unsigned(40, 9);    -- 256x192 area
+            c_max_vc      <= to_unsigned(263, 9);
+         
+            -- hdmi 360x240
+            
+            c_hdmi_xmin   <= to_unsigned(80, 9);
+            c_hdmi_xmax   <= to_unsigned(439, 9);
+            c_hdmi_ymin   <= to_unsigned(16, 9);
+            c_hdmi_ymax   <= to_unsigned(255, 9);
+            c_hdmi_ysync  <= to_unsigned(16+0, 9);
+            
+         end if;
          
       end if;
-      
-   end process;
-   
-   -- Signals generation
-   
-   vblank_top_cancel <= '1' when vc_s = c_vblank_max_s and hc_s >= c_hblank_min_s else '0';
-   vblank_bottom_cancel <= '1' when vc_s = c_vblank_min_s and hc_s < c_hblank_min_s else '0';
-   
-   process (hc_s, vc_s, c_hblank_min_s, c_hblank_max_s, c_vblank_min_s, c_vblank_max_s,
-            c_hsync_min_s, c_hsync_max_s, c_vsync_min_s, c_vsync_max_s, vblank_top_cancel, vblank_bottom_cancel)
-   begin
-      hblank_n_o  <= '1';
-      vblank_n_o  <= '1';
-      hsync_n_o   <= '1';
-      vsync_n_o   <= '1';
-
-      -- HBlank
-      if hc_s >= c_hblank_min_s and hc_s <= c_hblank_max_s then
-         hblank_n_o <= '0';
-      end if;
-      -- VBlank
-      if vc_s >= c_vblank_min_s and vc_s <= c_vblank_max_s then
-         vblank_n_o <= vblank_top_cancel or vblank_bottom_cancel;
-      end if;
-      -- HSync
-      if hc_s >= c_hsync_min_s and hc_s <= c_hsync_max_s then
-         hsync_n_o <= '0';
-      end if;
-      -- VSync
-      if vc_s >= c_vsync_min_s and vc_s <= c_vsync_max_s then
-         vsync_n_o <= '0';
-      end if;
 
    end process;
 
-   -- INT pulse generation, lasts one 7MHz period
+   -- frame counter
    
-   process (hc_s, vc_s, cvc_s, c_int_v_s, c_int_h_s, max_cvc_s, lint_line_i, lint_ctrl_i)
-
-      variable lint_minus_one_v  : unsigned(8 downto 0);
+   max_hc <= '1' when hc = c_max_hc else '0';
+   
+   process (i_CLK_7)
    begin
-   
-      int_ula_s <= '0';
-      int_lint_s <= '0';
-      lint_minus_one_v := unsigned(lint_line_i) - 1;
-      
-      if lint_ctrl_i(0) = '1' then
-         if vc_s = c_int_v_s and hc_s = c_int_h_s then
-            int_ula_s <= '1';
-         end if;
-      end if;
-      
-      if lint_ctrl_i(1) = '1' and hc_s = 256 then
-         if lint_line_i = 0 then
-            if max_cvc_s = '1' then
-               int_lint_s <= '1';
-            end if;
-         elsif cvc_s = lint_minus_one_v then
-            int_lint_s <= '1';
-         end if;
-      end if;
-      
-   end process;
-   
-   ula_int_o <= int_ula_s;
-   line_int_o <= int_lint_s;
-
-   -- Pixel position counters
-   
-   -- All timing refers to the ULA counter as implemented in the original hardware.
-   -- The ULA produces its first pixel in the 256 pixel wide area during count 12.
-   
-   -- Practical counters are generated for other modules that count the actual pixel
-   -- position being generated in the current cycle as well as delivering negative values
-   -- leading up to pixel zero.
-   
-   -- ULA counter, pixel 0 is generated in cycle 12
-   
-   max_hc_s <= '1' when hc_s = c_max_hc_s else '0';
-   
-   process (clock_i)
-   begin
-      if rising_edge(clock_i) then
-         if reset_conter_i = '1' then
-            hc_s <= (others => '0');
-         elsif max_hc_s = '1' then
-            hc_s <= (others => '0');
+      if rising_edge(i_CLK_7) then
+         if max_hc = '1' then
+            hc <= (others => '0');
          else
-            hc_s <= hc_s + 1;
+            hc <= hc + 1;
          end if;
       end if;
    end process;
-
-   max_vc_s <= '1' when vc_s = c_max_vc_s else '0';
    
-   process (clock_i)
+   max_vc <= '1' when vc = c_max_vc else '0';
+   
+   process (i_CLK_7)
    begin
-      if rising_edge(clock_i) then
-         if reset_conter_i = '1' then
-            vc_s <= c_vsync_min_s;
-         elsif max_hc_s = '1' then
-            if max_vc_s = '1' then
-               vc_s <= (others => '0');
+      if rising_edge(i_CLK_7) then
+         if max_hc = '1' then
+            if max_vc = '1' then
+               vc <= (others => '0');
             else
-               vc_s <= vc_s + 1;
+               vc <= vc + 1;
             end if;
          end if;
       end if;
    end process;
    
-   -- Copper offset vertical counter
+   -- EVERYTHING BELOW DELAYED ONE PIXEL FROM FRAME COUNTER
    
-   max_cvc_s <= '1' when cvc_s = c_max_vc_s else '0';
-   
-   process (clock_i)
+   -- frame signals
+
+   process (i_CLK_7)
    begin
-      if rising_edge(clock_i) then
-         if reset_conter_i = '1' then
-            cvc_s <= c_vsync_min_s;
-         elsif max_hc_s = '1' then
-            if max_vc_s = '1' then
-               cvc_s <= unsigned('0' & cu_offset_i);
-            elsif max_cvc_s = '1' then
-               cvc_s <= (others => '0');
+      if rising_edge(i_CLK_7) then   ----blank
+         if (hc >= c_min_hblank) and (hc <= c_max_hblank) then
+				hblank_n <= '0';
+         else
+				hblank_n <= '1';
+         end if;
+		 If (vc >= c_min_vblank) and (vc <= c_max_vblank) then
+            vblank_n <= '0';
+
+         else
+            vblank_n <= '1';
+         end if;
+      end if;
+   end process;
+   
+   o_vblank_n <= vblank_n;
+   o_hblank_n <= hblank_n;
+
+   process (i_CLK_7)
+   begin
+      if rising_edge(i_CLK_7) then
+         if (hc >= c_min_hsync) and (hc <= c_max_hsync) then
+            hsync_n <= '0';
+         else
+            hsync_n <= '1';
+         end if;
+         if (vc >= c_min_vsync) and (vc <= c_max_vsync) then
+            vsync_n <= '0';
+         else
+            vsync_n <= '1';
+         end if;
+      end if;
+   end process;
+   
+   o_hsync_n <= hsync_n;
+   o_vsync_n <= vsync_n;
+   
+   process (i_CLK_7)
+   begin
+      if rising_edge(i_CLK_7) then
+         if (max_hc = '1') and (max_vc = '1') then
+            frame_sync <= '1';
+         else
+            frame_sync <= '0';
+         end if;
+      end if;
+   end process;
+   
+   o_frame_sync <= frame_sync;
+   
+   process (i_CLK_7)
+   begin
+      if rising_edge(i_CLK_7) then
+         if (hc >= c_hdmi_xmin) and (hc <= c_hdmi_xmax) and (vc >= c_hdmi_ymin) and (vc <= c_hdmi_ymax) then
+            hdmi_pixel_en <= '1';
+         else
+            hdmi_pixel_en <= '0';
+         end if;
+      end if;
+   end process;
+   
+   o_hdmi_pixel_en <= hdmi_pixel_en;
+   
+   process (i_CLK_7)
+   begin
+      if rising_edge(i_CLK_7) then
+         if (vc = c_hdmi_ysync) and (max_hc = '1') then
+            hdmi_frame_lock <= '1';
+         else
+            hdmi_frame_lock <= '0';
+         end if;
+      end if;
+   end process;
+   
+   o_hdmi_frame_lock <= hdmi_frame_lock;
+
+   -- pixel counters
+   
+   -- ula
+
+   ula_min_hactive <= c_min_hactive - 12;
+   ula_max_hc <= '1' when hc = ula_min_hactive else '0';
+   ula_min_vactive <= '1' when vc = c_min_vactive else '0';
+   
+   process (i_CLK_7)
+   begin
+      if rising_edge(i_CLK_7) then
+         if ula_max_hc = '1' then
+            hc_ula <= (others => '0');
+         else
+            hc_ula <= hc_ula + 1;
+         end if;
+      end if;
+   end process;
+   
+   o_hc_ula <= hc_ula;
+   
+   process (i_CLK_7)
+   begin
+      if rising_edge(i_CLK_7) then
+         if ula_max_hc = '1' then
+            if ula_min_vactive = '1' then
+               vc_ula <= (others => '0');
             else
-               cvc_s <= cvc_s + 1;
+               vc_ula <= vc_ula + 1;
             end if;
          end if;
       end if;
    end process;
+
+   o_vc_ula <= vc_ula;
    
-   -- Practical wide counters.  (0,0) corresponds to (-32,-32) for the 320 x 256 surface
+   -- copper offset vertical counter
    
-   max_whc_s <= '1' when hc_s = (c_max_hc_s - 32+12-16) else '0';
-   
-   process (clock_i)
+   process (i_CLK_7)
    begin
-      if rising_edge(clock_i) then
-         if reset_conter_i = '1' then
-            whc_s <= (others => '0');
-         elsif max_whc_s = '1' then
-            whc_s <= "111110000";      -- starting at -16
-         else
-            whc_s <= whc_s + 1;
-         end if;
-      end if;
-   end process;
-   
-   process (clock_i)
-   begin
-      if rising_edge(clock_i) then
-         if reset_conter_i = '1' then
-            wvc_s <= to_unsigned(256, 9);
-         elsif max_whc_s = '1' then
-            if vc_s = (c_max_vc_s - 32-2) then
-               wvc_s <= "111111110";   -- starting at -2
+      if rising_edge(i_CLK_7) then
+         if ula_max_hc = '1' then
+            if ula_min_vactive = '1' then
+               cvc <= unsigned ('0' & i_cu_offset);
+            elsif cvc = c_max_vc then
+               cvc <= (others => '0');
             else
-               wvc_s <= wvc_s + 1;
+               cvc <= cvc + 1;
             end if;
          end if;
       end if;
    end process;
    
-   -- Practical 256 horizontal counter.  0 corresponds to pixel x=0 on the 256 x 192 surface
-
-   process (clock_i)
+   o_vc_cu <= cvc;
+   
+   -- practical wide counters for 320x256 surface
+   
+   wide_min_hactive <= c_min_hactive - 32 - 16;
+   wide_min_vactive <= c_min_vactive - 32 - 2;
+   
+   wide_hactive <= '1' when hc = wide_min_hactive else '0';
+   
+   process (i_CLK_7)
    begin
-      if rising_edge(clock_i) then
-         if reset_conter_i = '1' then
-            phc_s <= (others => '0');
-         elsif max_whc_s = '1' then
-            phc_s <= "111010000";      -- starting at -48
+      if rising_edge(i_CLK_7) then
+         if wide_hactive = '1' then
+            whc <= "111110000";   -- start at -16
          else
-            phc_s <= phc_s + 1;
+            whc <= whc + 1;
          end if;
       end if;
    end process;
    
-   -- 28MHZ sub-pixel counter
+   o_whc <= whc;
    
-   process (clock_x4_i)
+   process (i_CLK_7)
    begin
-      if rising_edge(clock_x4_i) then
-         if reset_conter_i = '1' then
-            whc_lsb_d <= '0';
-         else
-            whc_lsb_d <= whc_s(0);
-         end if;
-      end if;
-   end process;
-   
-   process (clock_x4_i)
-   begin
-      if rising_edge(clock_x4_i) then
-         if reset_conter_i = '1' then
-            sc_s <= (others => '0');
-         elsif whc_s(0) /= whc_lsb_d then
-            sc_s <= "01";
-         else
-            sc_s <= sc_s + 1;
+      if rising_edge(i_CLK_7) then
+         if wide_hactive = '1' then
+            if vc = wide_min_vactive then
+               wvc <= "111111110";   -- start at -2
+            else
+               wvc <= wvc + 1;
+            end if;
          end if;
       end if;
    end process;
 
-   --
-   
-   hcount_o <= hc_s;
-   vcount_o <= vc_s;
-   
-   phcount_o <= phc_s;
-   
-   whcount_o <= whc_s;
-   wvcount_o <= wvc_s;
-   cvcount_o <= cvc_s;
-   
-   sc_o <= sc_s;
+   o_wvc <= wvc;
 
+   -- practical counter for 256x192 surface
+   
+   process (i_CLK_7)
+   begin
+      if rising_edge(i_CLK_7) then
+         if wide_hactive = '1' then
+            phc <= "111010000";   -- start at -48
+         else
+            phc <= phc + 1;
+         end if;
+      end if;
+   end process;
+   
+   o_phc <= phc;
+
+   -- 28 MHz sub-pixel counter
+
+   process (i_CLK_28)
+   begin
+      if rising_edge(i_CLK_28) then
+         whc_0_d <= whc(0);
+      end if;
+   end process;
+   
+   process (i_CLK_28)
+   begin
+      if rising_edge(i_CLK_28) then
+         if whc(0) /= whc_0_d then
+            sc <= "01";
+         else
+            sc <= sc + 1;
+         end if;
+      end if;
+   end process;
+   
+   o_sc <= sc;
+
+   -- interrupts
+   
+   process (i_CLK_7)
+   begin
+      if rising_edge(i_CLK_7) then
+         if (i_inten_ula_n = '0') and (hc = c_int_h) and (vc = c_int_v) then
+            int_ula <= '1';
+         else
+            int_ula <= '0';
+         end if;
+      end if;
+   end process;
+   
+   o_int_ula <= int_ula;
+
+   -- semantics for line interrupt is that it occurs before the line is drawn
+   
+   process (i_CLK_7)
+   begin
+      if rising_edge(i_CLK_7) then
+         if i_int_line = 0 then
+            int_line_num <= c_max_vc;
+         else
+            int_line_num <= unsigned(i_int_line) - 1;
+         end if;
+      end if;
+   end process;
+
+   process (i_CLK_7)
+   begin
+      if rising_edge(i_CLK_7) then
+         if (i_inten_line = '1') and (hc_ula = 255) and (cvc = int_line_num) then
+            int_line <= '1';
+         else
+            int_line <= '0';
+         end if;
+      end if;
+   end process;
+   
+   o_int_line <= int_line;
+      
 end architecture;

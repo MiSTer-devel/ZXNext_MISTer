@@ -34,12 +34,11 @@
 --   https://faqwiki.zxnet.co.uk/wiki/Contended_memory Emulator Reference
 --   https://zxnet.co.uk/spectrum/schematics/Z70830.pdf +3 Schematic
 --   http://sky.relative-path.com/zx/floating_bus.html by Ast A Moore
---   http://sblive.narod.ru/ZX-Spectrum/Pentagon128k/Pentagon128k.htm by Z.A.N.
 --
 -- The implementation was simplified somewhat from Chris Smith's description and then
 -- was complicated by the addition of pixel scrolling and re-interpretation of the
--- attribute byte.  It's likely possible to reduce the number of registers used
--- but only at the expense of clarity.
+-- attribute byte.  It's definitely possible to rationalize this implementation but
+-- that comes at the expense of clarity.
 --
 -- The display position as seen by the ULA and as described in Chris' book is held
 -- in i_vc and i_hc.  There is a second horizontal counter i_phc which is a practical
@@ -589,11 +588,11 @@ begin
    begin
       if rising_edge(i_CLK_CPU) then
          mreq23_n <= i_cpu_mreq_n;
-         ioreqtw3_n <= i_cpu_iorq_n;
+         ioreqtw3_n <= i_cpu_iorq_n or not i_contention_port;
       end if;
    end process;
 
-   o_cpu_contend <= '1' when ((i_contention_memory = '1' and mreq23_n = '1') or (i_contention_port = '1' and i_cpu_iorq_n = '0' and ioreqtw3_n = '1')) and i_timing_p3 = '0' and wait_s = '1' else '0';
+   o_cpu_contend <= '1' when ((i_contention_memory = '1' and mreq23_n = '1' and ioreqtw3_n = '1') or (i_contention_port = '1' and i_cpu_iorq_n = '0' and ioreqtw3_n = '1')) and i_timing_p3 = '0' and wait_s = '1' else '0';
    
    -- +3
 

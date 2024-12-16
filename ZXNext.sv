@@ -57,7 +57,8 @@ module emu
 	input  [11:0] HDMI_WIDTH,
 	input  [11:0] HDMI_HEIGHT,
 	output        HDMI_FREEZE,
-
+	output        HDMI_BLACKOUT,
+	
 `ifdef MISTER_FB
 	// Use framebuffer in DDRAM
 	// FB_FORMAT:
@@ -191,13 +192,14 @@ assign VGA_SCALER = 0;
 assign VGA_DISABLE = 0;
 assign VGA_F1 = 0;
 assign HDMI_FREEZE = 0;
+assign HDMI_BLACKOUT = 0;
 
 // Status Bit Map:
 //              Upper                          Lower
 // 0         1         2         3          4         5         6
 // 01234567890123456789012345678901 23456789012345678901234567890123
 // 0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
-// XXXXXXXXXXX               XXXX
+// XXXXXXXXXXXXX              XXXX
 
 
 `include "build_id.v" 
@@ -223,6 +225,13 @@ localparam CONF_STR = {
 	"h6TA,CPU Clock:            28MHz;",
 	"R0,Soft Reset;",
 	"R9,Hard Reset;",
+	
+	"h7-;",
+	"h7P3,Debug;",
+	"h7P3-;",
+	"h7P3O[11],Machine,Mister,Next;",
+	"h7P3O[12],Issue,2,4;",
+	"-   ;",
 	"J,A,B,C,X,Y,Z,Start;",
  	"V,v",`BUILD_DATE
 };
@@ -274,6 +283,9 @@ wire        ioctl_download;
 wire  [7:0] ioctl_index;
 wire        ioctl_wait;
 
+reg dbg_enabled = 0;
+
+
 hps_io #(.CONF_STR(CONF_STR), .VDNUM(2), .WIDE(1)) hps_io
 (
 	.clk_sys(clk_sys),
@@ -286,7 +298,7 @@ hps_io #(.CONF_STR(CONF_STR), .VDNUM(2), .WIDE(1)) hps_io
 
 	.buttons(buttons),
 	.status(status),
-	.status_menumask({cpu_speed==3,cpu_speed==2,cpu_speed==1,cpu_speed==0,en1080p,|vcrop,1'b0}),
+	.status_menumask({dbg_enabled,cpu_speed==3,cpu_speed==2,cpu_speed==1,cpu_speed==0,en1080p,|vcrop,1'b0}),
 
 	.sd_lba(sd_lba),
 	.sd_rd(sd_rd),
@@ -336,6 +348,9 @@ wire [10:0] j1 = {joy_1[7],joy_1[9],joy_1[8],joy_1[10],joy_1[4],joy_1[6],joy_1[5
 
 zxnext_top zxnext_top
 (
+	.g_machine_id(g_machine_id),
+	.g_board_issue(g_board_issue),
+	
 	.CLK_28        (clk_sys),
 	.CLK_14        (CLK_14),
 	.CLK_7         (CLK_7),
@@ -722,5 +737,22 @@ wire tape_led = act_cnt[22] ? act_cnt[21:14] > act_cnt[7:0] : act_cnt[21:14] <= 
 
 reg [22:0] act_cnt;
 always @(posedge clk_sys) if(~play_pause || ~(tape_ready ^ act_cnt[22]) || act_cnt[21:0]) act_cnt <= act_cnt + 1'd1;
+
+reg [7:0] g_machine_id =8'h0A;
+reg [3:0] g_board_issue =4'h0;
+	
+always @(posedge clk_sys) begin
+ if (joy_0[10] && joy_0[10]) dbg_enabled <= 1;  // menu + Start + y for debug menu
+	
+	if(status[11]) 
+		g_machine_id= 8'h0A;
+	else 
+		g_machine_id =8'hDA;
+
+	if(status[12])
+		g_board_issue =4'h2;
+	else 
+		g_board_issue =4'h0;  
+end
 
 endmodule

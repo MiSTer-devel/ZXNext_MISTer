@@ -31,7 +31,8 @@ use ieee.std_logic_unsigned.all;
 
 entity im2_peripheral is
    generic (
-      constant VEC_BITS       : positive := 4
+      constant VEC_BITS       : positive  := 4;
+      constant EXCEPTION      : std_logic := '0'  -- 1 if im2 mode but z80 not in im2 should generate pulse interrupt
    );
    port (
       i_CLK_28                : in std_logic;
@@ -41,7 +42,8 @@ entity im2_peripheral is
       i_m1_n                  : in std_logic;
       i_iorq_n                : in std_logic;
       
-      i_mode_pulse_0_im2_1    : in std_logic;    -- select standard pulsed zx mode or im2 vector mode
+      i_im2_mode              : in std_logic;    -- 1 if z80 is in im 2 mode, 1 if unknown
+      i_mode_pulse_0_im2_1    : in std_logic;    -- select standard pulsed zx mode or hw im2 mode
       
       i_iei                   : in std_logic;    -- im2 daisy chain
       o_ieo                   : out std_logic;   -- im2 daisy chain
@@ -51,39 +53,58 @@ entity im2_peripheral is
       
       i_int_en                : in std_logic;    -- enable interrupts from this device
       i_int_req               : in std_logic;    -- interrupt request from this device (level active, must not persist through im2_isr_serviced signal)
+      i_int_unq               : in std_logic;    -- unqualifed interrupt request from this device (enable not required)
    
       i_int_status_clear      : in std_logic;    -- clear interrupt status bit if 1 (i_CLK_28)
       o_int_status            : out std_logic;   -- current state of interrupt status bit (i_CLK_28)
 
-      o_int_n                 : out std_logic;   -- active low interrupt signal to z80 if in im2 mode
-      o_pulse_en              : out std_logic;   -- active high signal for pulse interrupt, same duration as i_int_req (active regardless of pulse/im2 mode)
+      o_int_n                 : out std_logic;   -- active low interrupt signal to z80 when in hw im2 mode
+      o_pulse_en              : out std_logic;   -- active high signal for pulse interrupt, same duration as i_int_req when not in hw im2 mode
    
       i_vector                : in std_logic_vector(VEC_BITS-1 downto 0);
       o_vector                : out std_logic_vector(VEC_BITS-1 downto 0);
       
       i_dma_int_en            : in std_logic;
-      o_dma_int               : out std_logic    -- set if dma operation should be interrupted, must qualify with im2 mode
+      o_dma_int               : out std_logic    -- set if dma operation should be interrupted
    );
 end entity;
 
 architecture rtl of im2_peripheral is
    
+   signal int_req             : std_logic;
+   signal int_req_d           : std_logic;
+   
    signal im2_reset_n         : std_logic;
+
    
    signal isr_serviced        : std_logic;
    signal isr_serviced_d      : std_logic;
    signal im2_isr_serviced    : std_logic;
    
    signal int_status          : std_logic;
-   signal next_int_status     : std_logic;
 
    signal im2_int_req         : std_logic;
 
 begin
 
-   im2_reset_n <= i_mode_pulse_0_im2_1 and i_int_en and not i_reset;
+   -- interrupt request
    
+   process (i_CLK_28)
+   begin
+      if rising_edge(i_CLK_28) then
+         if i_reset = '1' then
+            int_req_d <= '0';
+         else
+            int_req_d <= i_int_req;
+         end if;
+      end if;
+   end process;
+   
+   int_req <= i_int_req and not int_req_d;
+
    -- im2 device logic
+   
+   im2_reset_n <= i_mode_pulse_0_im2_1 and not i_reset;
    
    im2_logic: entity work.im2_device
    generic map (
@@ -92,6 +113,8 @@ begin
    port map (
       i_CLK_CPU         => i_CLK_CPU,
       i_reset_n         => im2_reset_n,
+	  
+	  i_im2_mode        => i_im2_mode,
       
       i_m1_n            => i_m1_n,
       i_iorq_n          => i_iorq_n,
@@ -99,6 +122,9 @@ begin
       i_int_req         => im2_int_req,
       o_int_n           => o_int_n,
       
+	  i_dma_int_en      => i_dma_int_en,
+      o_dma_int         => o_dma_int,
+
       i_reti_decode     => i_reti_decode,
       i_reti_seen       => i_reti_seen,
       o_isr_serviced    => isr_serviced,
@@ -123,31 +149,54 @@ begin
    
    im2_isr_serviced <= isr_serviced and not isr_serviced_d;
 
-   -- interrupt status register
-   -- record of whether interrupt occurred, only cleared by write or im2 reset
 
-   next_int_status <= i_int_req or (int_status and (im2_reset_n or not i_int_status_clear) and (not im2_isr_serviced));
+   -- interrupt status bit
+
+
    
+   -- record of whether interrupt request came from device, can be cleared
+         
    process (i_CLK_28)
    begin
       if rising_edge(i_CLK_28) then
          if i_reset = '1' then
             int_status <= '0';
          else
-            int_status <= next_int_status;
+            int_status <= (int_req or i_int_unq) or (int_status and not i_int_status_clear);
          end if;
       end if;
    end process;
    
-   o_int_status <= int_status;
+   -- im2 mode interrupt pending, only cleared when isr serviced
    
-   -- im2 interrupt logic
+   process (i_CLK_28)
+   begin
+      if rising_edge(i_CLK_28) then
+         if im2_reset_n = '0' then
+            im2_int_req <= '0';
+         elsif (i_int_unq = '1') or (int_req = '1' and i_int_en = '1') then
+            im2_int_req <= '1';
+         else
+            im2_int_req <= im2_int_req and not im2_isr_serviced;
+         end if;
+      end if;
+   end process;
+
+   o_int_status <= int_status or im2_int_req;
    
-   im2_int_req <= int_status;  -- im2 device is held in reset if interrupt is not enabled
-   o_dma_int <= int_status and i_int_en and i_dma_int_en;  -- should be qualified by im2 mode
+   -- pulse interrupt logic
+   
+   
+	o_pulse_en <= ((int_req and i_int_en) or i_int_unq) and not i_mode_pulse_0_im2_1;
 
    -- pulse interrupt logic
    
-   o_pulse_en <= i_int_req and i_int_en;
+ --  gen_pulse_1: if (EXCEPTION = '1') generate
+
+ --           o_pulse_en <= ((int_req and i_int_en) or i_int_unq) and ((i_mode_pulse_0_im2_1 and not i_im2_mode) or (not i_mode_pulse_0_im2_1));
+
+
+ --  end generate;
+
 
 end architecture;

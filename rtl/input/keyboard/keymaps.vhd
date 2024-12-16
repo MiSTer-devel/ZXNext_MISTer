@@ -60,7 +60,7 @@ architecture Behavior of keymaps is
    -- bit 7    = SYMBOL  \  must not be
    -- bit 6    = CAPS    /  "11"
    -- bits 5-3 = row
-   -- bits 2-0 = col (only 0-6)
+   -- bits 2-0 = col (only 0-6) 7 = no action
    --
    -- CASE 2 - Function Key
    --
@@ -93,15 +93,20 @@ architecture Behavior of keymaps is
    --    Tab                = TRUE VIDEO
    --    \                  = INV VIDEO (right side of same row as tab)
    --
+   --    F3  = 50 / 60 Hz toggle
    --    F4  = soft reset
    --    F8  = cpu speed
    --    F9  = reserved (multiface nmi)
    --    F10 = reserved (divmmc nmi)
    --    F11 = expansion bus on
    --    F12 = expansion bus off
+   --
+   --    PAUSE/BREAK = reserved (reset ps2 module)
+   
+   -- Table of ps2 scan codes https://techdocs.altium.com/display/FPGA/PS2+Keyboard+Scan+Codes
 
 --                    F9                        F5           F3           F1           F2           F12
-        "000000111", "000000111", "000000111", "000000111", "000000111", "000000111", "000000111", "011000101",   -- 00..07
+        "000000111", "000000111", "000000111", "000000111", "011000010", "000000111", "000000111", "011000101",   -- 00..07
 --                    F10          F8           F6           F4           Tab          ` ~
         "000000111", "000000111", "011000111", "000000111", "011000011", "000010101", "000011110", "000000111",   -- 08..0F
 --                    LAlt         LShft                     LCtrl        Q            1 !

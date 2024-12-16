@@ -48,7 +48,6 @@ end entity;
 architecture rtl of fifop is
 
    signal stored        : std_logic_vector(DEPTH_BITS downto 0);
-   signal stored_delta  : std_logic_vector(DEPTH_BITS downto 0);
    
    signal empty      : std_logic;
    signal full       : std_logic;
@@ -118,17 +117,15 @@ begin
    
    -- track number of stored bytes
    
-   stored_delta <= std_logic_vector(to_unsigned(1,stored_delta'length)) when (rd_advance = '0' and wr_advance = '1') else 
-                   std_logic_vector(to_unsigned(-1,stored_delta'length)) when (rd_advance = '1' and wr_advance = '0') else
-                   std_logic_vector(to_unsigned(0,stored_delta'length));
-   
    process (i_CLK)
    begin
       if rising_edge(i_CLK) then
          if i_reset = '1' then
             stored <= (others => '0');
-         else
-            stored <= stored + stored_delta;
+         elsif rd_advance = '0' and wr_advance = '1' then
+            stored <= stored + 1;
+         elsif rd_advance = '1' and wr_advance = '0' then
+            stored <= stored - 1;
          end if;
       end if;
    end process;

@@ -88,13 +88,16 @@ begin
    page0 <= '1' when i_cpu_a_15_13 = "000" else '0';
    page1 <= '1' when i_cpu_a_15_13 = "001" else '0';
    
-   rom_en <= '1' when (page0 = '1' and (conmem = '1' or (mapram = '0' and automap = '1'))) else '0';
-   ram_en <= '1' when (page0 = '1' and conmem = '0' and mapram = '1' and automap = '1') or (page1 = '1' and (conmem = '1' or automap = '1')) else '0';
+   -- Issue #7 : Also bring in divmmc bank 3 as rom substitute when conmem is set
+   -- This is a departure from the original divmmc hardware
+   
+   rom_en <= '1' when (page0 = '1' and (conmem = '1' or automap = '1') and mapram = '0') else '0';
+   ram_en <= '1' when (page0 = '1' and (conmem = '1' or automap = '1') and mapram = '1') or (page1 = '1' and (conmem = '1' or automap = '1')) else '0';
    ram_bank <= X"3" when page0 = '1' else i_divmmc_reg(3 downto 0);
    
    o_divmmc_rom_en <= rom_en and i_en;
    o_divmmc_ram_en <= ram_en and i_en;
-   o_divmmc_rdonly <= page0;
+   o_divmmc_rdonly <= '1' when page0 = '1' or (mapram = '1' and ram_bank = X"3") else '0';
    o_divmmc_ram_bank <= ram_bank;
 
    -- NMI

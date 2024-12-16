@@ -1,6 +1,5 @@
-
--- Asymmetrical Button Debounce
--- Copyright 2020 Alvin Albrecht
+-- Signal Relaxation
+-- Copyright 2022 Alvin Albrecht
 --
 -- This file is part of the ZX Spectrum Next Project
 -- <https://gitlab.com/SpectrumNext/ZX_Spectrum_Next_FPGA/tree/master/cores>
@@ -19,46 +18,48 @@
 -- along with the ZX Spectrum Next FPGA source code.  If not, see 
 -- <https://www.gnu.org/licenses/>.
 
--- Allow an immediate transtion to the not initial state but the input must
--- hold the initial state for the time to transition back to the initial state.
+-- An input high signal is brought back to zero after a minimum time has passed.
 
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.std_logic_unsigned.all;
 
-entity asymmetrical_debounce is
+entity relaxation is
    generic
    (
+      INVERT         : std_logic := '0';
       INITIAL_STATE  : std_logic := '0';
       COUNTER_SIZE   : positive := 4
    );
    port
    (
-      clk_i          : in std_logic;
-      clk_en_i       : in std_logic;
-      reset_i        : in std_logic;
-      button_i       : in std_logic;
-      button_o       : out std_logic
+      i_CLK          : in std_logic;
+      i_CLK_EN       : in std_logic;
+      i_sig          : in std_logic;
+      o_sig          : out std_logic
    );
 end entity;
 
-architecture rtl of asymmetrical_debounce is
+architecture rtl of relaxation is
 
+   signal sig           : std_logic;
    signal counter       : std_logic_vector(COUNTER_SIZE downto 0) := (others => '0');
-   signal button_db     : std_logic := INITIAL_STATE;
+   signal sig_relaxed   : std_logic := INITIAL_STATE;
 
 begin
 
+   -- optional signal inversion
+   
+   sig <= i_sig xor INVERT;
+   
    -- counter
    
-   process (clk_i)
+   process (i_CLK)
    begin
-      if rising_edge(clk_i) then
-         if reset_i = '1' then
+      if rising_edge(i_CLK) then
+         if sig = '0' then
             counter <= (others => '0');
-         elsif button_i /= INITIAL_STATE then
-		    counter <= (others => '0');
-         elsif clk_en_i = '1' and counter(COUNTER_SIZE) = '0' then
+         elsif i_CLK_EN = '1' and counter(COUNTER_SIZE) = '0' then
             counter <= counter + 1;
          end if;
       end if;
@@ -66,21 +67,13 @@ begin
    
    -- output
    
-   process (clk_i)
+   process (i_CLK)
    begin
-      if rising_edge(clk_i) then
-         if reset_i = '1' then
-            button_db <= INITIAL_STATE;
-         else
-            if button_db = INITIAL_STATE then
-               button_db <= button_i;
-            elsif counter(COUNTER_SIZE) = '1' then
-               button_db <= INITIAL_STATE;
-            end if;
-         end if;
+      if rising_edge(i_CLK) then
+         sig_relaxed <= sig and not counter(COUNTER_SIZE);
       end if;
    end process;
-
-   button_o <= button_db;
+   
+   o_sig <= sig_relaxed;
 
 end architecture;

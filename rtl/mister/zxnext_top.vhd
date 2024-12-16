@@ -29,11 +29,16 @@ use ieee.std_logic_unsigned.all;
 
 entity zxnext_top is
    generic (
-      g_machine_id      : unsigned(7 downto 0)  := X"DA";   -- MiSTer
-      g_version         : unsigned(7 downto 0)  := X"31";   -- 3.01
-      g_sub_version     : unsigned(7 downto 0)  := X"0A"    -- .10
+      --g_machine_id      : unsigned(7 downto 0)  := X"0A";
+		g_video_def       : unsigned(2 downto 0)  := "000";
+      g_version         : unsigned(7 downto 0)  := X"32";   
+      g_sub_version     : unsigned(7 downto 0)  := X"00";
+	   --g_board_issue     : unsigned(3 downto 0)  := X"2";
+	   g_video_inc       : unsigned(1 downto 0)  := "10"   
    );
    port (
+        g_machine_id      : in unsigned(7 downto 0);   --Debug option
+		g_board_issue     : in unsigned(3 downto 0);   --Debug option
 		-- Clocks
 		CLK_28            : in  std_logic;
 		CLK_14            : in  std_logic;
@@ -69,8 +74,8 @@ entity zxnext_top is
 		sd_miso_i         : in  std_logic := '1';
 
 		-- Joystick
-		joy_left          : in  std_logic_vector(10 downto 0); -- active high  X Z Y START A C B U D L R
-		joy_right         : in  std_logic_vector(10 downto 0); -- active high  X Z Y START A C B U D L R
+		joy_left          : in  std_logic_vector(11 downto 0); -- active high  X Z Y START A C B U D L R
+		joy_right         : in  std_logic_vector(11 downto 0); -- active high  X Z Y START A C B U D L R
 
 		-- Audio
 		audio_L           : out std_logic_vector(11 downto 0);
@@ -95,6 +100,7 @@ entity zxnext_top is
 
 		uart_rx_i         : in  std_logic;
 		uart_tx_o         : out std_logic
+		
 	);
 end entity;
 
@@ -402,12 +408,17 @@ begin
    zxnext : entity work.zxnext
    generic map
    (
-      g_machine_id         => g_machine_id,
+      --g_machine_id         => g_machine_id,
+		g_video_def				=> g_video_def,
       g_version            => g_version,
-      g_sub_version        => g_sub_version
+      g_sub_version        => g_sub_version,
+	  --g_board_issue        => g_board_issue,
+		g_video_inc				=> g_video_inc
    )
    port map
    (
+	  g_machine_id         => g_machine_id,    --Debug option
+	  g_board_issue        => g_board_issue,   --Degub option
       -- CLOCK
       
       i_CLK_28             => CLK_28,
@@ -485,6 +496,9 @@ begin
       
       i_UART0_RX           => uart_rx_i,
       o_UART0_TX           => uart_tx_o,
+	  i_UART0_CTS_n        => '0',
+      o_UART0_RTR_n        => open,
+
       
       -- VIDEO
       -- synchronized to i_CLK_14
@@ -541,5 +555,8 @@ begin
 
    audio_L <= (others => '1') when zxn_audio_L_pre(12) = '1' else zxn_audio_L_pre(11 downto 0);
    audio_R <= (others => '1') when zxn_audio_R_pre(12) = '1' else zxn_audio_R_pre(11 downto 0);
+	
 
+--	g_machine_id <= X"0A" when machine = '1' else g_machine_id <=X"DA";
+-- g_board_issue <= X"0" when issue = '1' else X"2";
 end architecture;

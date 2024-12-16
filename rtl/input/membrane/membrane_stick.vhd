@@ -34,10 +34,10 @@ entity membrane_stick is
 
       i_joy_en_n           : in std_logic;
 
-      i_joy_left           : in std_logic_vector(10 downto 0);
+      i_joy_left           : in std_logic_vector(11 downto 0);  -- active high  MODE X Z Y START A C B U D L R
       i_joy_left_type      : in std_logic_vector(2 downto 0);
 
-      i_joy_right          : in std_logic_vector(10 downto 0);
+      i_joy_right          : in std_logic_vector(11 downto 0);  -- active high  MODE X Z Y START A C B U D L R
       i_joy_right_type     : in std_logic_vector(2 downto 0);
 
       i_membrane_row       : in std_logic_vector(2 downto 0);
@@ -65,7 +65,7 @@ architecture rtl of membrane_stick is
    signal state               : std_logic := '0';
    signal state_next          : std_logic;
    
-   signal joy_state           : std_logic_vector(10 downto 0);
+   signal joy_state           : std_logic_vector(11 downto 0);
    signal joy_type            : std_logic_vector(2 downto 0);
    signal joy_addr_start      : std_logic_vector(4 downto 0);
    signal joy_bit_count_start : std_logic_vector(3 downto 0);
@@ -136,15 +136,15 @@ begin
          when "111" =>   -- User Defined
             joy_addr_start <= "10000";
             joy_bit_count_start <= "0000";
-            joy_bit_count_end <= "1010";
+            joy_bit_count_end <= "1011";
          when "001" | "100" =>  -- Kempston
             joy_addr_start <= "10101";
             joy_bit_count_start <= "0101";
-            joy_bit_count_end <= "1010";
+            joy_bit_count_end <= "1011";
          when others =>  -- MD Pad
             joy_addr_start <= "11000";
             joy_bit_count_start <= "1000";
-            joy_bit_count_end <= "1010";
+            joy_bit_count_end <= "1011";
       end case;
    end process;
    

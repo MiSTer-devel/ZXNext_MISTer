@@ -58,12 +58,6 @@ architecture rtl of emu_fnkeys is
    signal timer_set        : std_logic;
    signal timer_expired    : std_logic;
    
-   signal button_m1_n_edge       : std_logic_vector(1 downto 0)   := "00";
-   signal button_m1_n_assert     : std_logic;
-   
-   signal button_reset_n_edge    : std_logic_vector(1 downto 0)   := "00";
-   signal button_reset_n_assert  : std_logic;
-   
    type state_t is (S_IDLE, S_MF_ROW_A11, S_MF_ROW_A12, S_MF_CHECK, S_MF_DONE, S_RESET_CHECK, S_RESET_DONE);
    
    signal state            : state_t;
@@ -86,7 +80,7 @@ begin
    -- timer
    --
    
-   timer_set <= '1' when state = S_IDLE and (button_reset_n_assert = '1' or button_m1_n_assert = '1') else '0';
+   timer_set <= '1' when state = S_IDLE and (i_button_reset_n = '0' or i_button_m1_n = '0') else '0';
    timer_expired <= '1' when timer_count = 0 else '0';
    
    process (i_CLK)
@@ -103,36 +97,6 @@ begin
    end process;
    
    --
-   -- button edge detection
-   --
-
-   process (i_CLK)
-   begin
-      if rising_edge(i_CLK) then
-         if i_reset = '1' then
-            button_m1_n_edge <= (others => '0');
-         else
-            button_m1_n_edge <= button_m1_n_edge(0) & i_button_m1_n;
-         end if;
-      end if;
-   end process;
-   
-   button_m1_n_assert <= '1' when button_m1_n_edge = "10" else '0';
-
-   process (i_CLK)
-   begin
-      if rising_edge(i_CLK) then
-         if i_reset = '1' then
-            button_reset_n_edge <= (others => '0');
-         else
-            button_reset_n_edge <= button_reset_n_edge(0) & i_button_reset_n;
-         end if;
-      end if;
-   end process;
-   
-   button_reset_n_assert <= '1' when button_reset_n_edge = "10" else '0';
-   
-   --
    -- state machine
    --
    
@@ -147,14 +111,14 @@ begin
       end if;
    end process;
 
-   process (state, button_m1_n_assert, button_m1_n_edge, button_reset_n_assert, button_reset_n_edge)
+   process (state, i_button_m1_n, i_button_reset_n)
    begin
       case state is
          
          when S_IDLE =>
-            if button_reset_n_assert = '1' then
+            if i_button_reset_n = '0' then
                next_state <= S_RESET_CHECK;
-            elsif button_m1_n_assert = '1' then
+            elsif i_button_m1_n = '0' then
                next_state <= S_MF_ROW_A11;
             else
                next_state <= S_IDLE;
@@ -167,7 +131,7 @@ begin
             next_state <= S_MF_CHECK;
          
          when S_MF_CHECK =>
-            if button_m1_n_edge(0) = '1' then
+            if i_button_m1_n = '1' then
                next_state <= S_MF_DONE;
             else
                next_state <= S_MF_ROW_A11;
@@ -177,7 +141,7 @@ begin
             next_state <= S_IDLE;
          
          when S_RESET_CHECK =>
-            if button_reset_n_edge(0) = '1' then
+            if i_button_reset_n = '1' then
                next_state <= S_RESET_DONE;
             else
                next_state <= S_RESET_CHECK;

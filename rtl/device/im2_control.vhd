@@ -55,6 +55,8 @@ entity im2_control is
       i_wr_n            : in std_logic;
       
       i_cpu_d           : in std_logic_vector(7 downto 0);
+	  
+      o_im_mode         : out std_logic_vector(1 downto 0);  -- 00 = im 0, 01 = im 1, 10 = im 2 changes on falling edge of T3
 
       o_reti_decode     : out std_logic;   -- reti is being decoded, only acknowledged interrupters should deassert IEO
       o_reti_seen       : out std_logic;   -- reti instruction has been detected active in T3 for rising edge of T4
@@ -68,7 +70,6 @@ end entity;
 architecture rtl of im2_control is
 
    signal ifetch              : std_logic;
-   signal ifetch_cancel       : std_logic;
    signal ifetch_d            : std_logic;
    signal ifetch_fe_t3        : std_logic;
    
@@ -78,18 +79,19 @@ architecture rtl of im2_control is
    signal opcode_4d           : std_logic;
    signal opcode_cb           : std_logic;
    signal opcode_45           : std_logic;
+   signal opcode_ddfd         : std_logic;
    
-   type state_t               is (S_0, S_ED_T4, S_ED4D_T4, S_ED45_T4, S_CB_T4, S_SRL_T1, S_SRL_T2);
+   type state_t               is (S_0, S_ED_T4, S_ED4D_T4, S_ED45_T4, S_CB_T4, S_SRL_T1, S_SRL_T2, S_DDFD_T4);
    signal state               : state_t;
    signal state_next          : state_t;
+   
+   signal im_mode             : std_logic_vector(1 downto 0) := "00";
 
 begin
 
    -- detect instruction fetch cycles
    
    ifetch <= '1' when i_m1_n = '0' and i_mreq_n = '0' else '0';
--- ifetch_cancel <= '1' when (i_m1_n = '1' and i_mreq_n = '0' and i_rfsh_n = '1') or i_iorq_n = '0' else '0';  -- includes dma operations
-   ifetch_cancel <= '1' when ((i_m1_n = '1' or i_mreq_n = '1') and (i_rd_n = '0' or i_wr_n = '0')) or i_iorq_n = '0' else '0';
    
    process (i_CLK_CPU)
    begin
@@ -117,7 +119,7 @@ begin
       end if;
    end process;
    
-   -- recognize important opcodes ED 4D CB 45
+   -- recognize important opcodes ED 4D CB 45 FD DD
    
    process (cpu_opcode)
    begin
@@ -126,12 +128,15 @@ begin
       opcode_4d <= '0';
       opcode_cb <= '0';
       opcode_45 <= '0';
+      opcode_ddfd <= '0';
       
       case cpu_opcode is
          when X"ED" => opcode_ed <= '1';
          when X"4D" => opcode_4d <= '1';
          when X"CB" => opcode_cb <= '1';
          when X"45" => opcode_45 <= '1';
+         when X"DD" => opcode_ddfd <= '1';
+         when X"FD" => opcode_ddfd <= '1';
          when others => null;
       end case;
    
@@ -150,7 +155,7 @@ begin
       end if;
    end process;
    
-   process (state, ifetch_fe_t3, opcode_ed, opcode_cb, opcode_4d, opcode_45, ifetch_cancel)  -- , i_busak_n)
+   process (state, ifetch_fe_t3, opcode_ed, opcode_cb, opcode_4d, opcode_45, opcode_ddfd)
    begin
       case state is
          when S_0 =>
@@ -158,16 +163,18 @@ begin
                state_next <= S_ED_T4;
             elsif ifetch_fe_t3 = '1' and opcode_cb = '1' then
                state_next <= S_CB_T4;
+            elsif ifetch_fe_t3 = '1' and opcode_ddfd = '1' then
+               state_next <= S_DDFD_T4;
             else
                state_next <= S_0;
             end if;
          when S_ED_T4 =>
-            if ifetch_cancel = '1' or (ifetch_fe_t3 = '1' and opcode_4d = '0' and opcode_45 = '0') then
-               state_next <= S_0;
-            elsif ifetch_fe_t3 = '1' and opcode_4d = '1' then
+            if ifetch_fe_t3 = '1' and opcode_4d = '1' then
                state_next <= S_ED4D_T4;
             elsif ifetch_fe_t3 = '1' and opcode_45 = '1' then
                state_next <= S_ED45_T4;
+            elsif ifetch_fe_t3 = '1' then
+               state_next <= S_0;
             else
                state_next <= S_ED_T4;
             end if;
@@ -180,20 +187,46 @@ begin
             state_next <= S_SRL_T2;
          when S_SRL_T2 =>
             state_next <= S_0;
-         --
          when S_ED45_T4 =>
-            state_next <= S_0;
+--          state_next <= S_0;
+            state_next <= S_SRL_T1;
          when S_CB_T4 =>
-            if ifetch_cancel = '1' or ifetch_fe_t3 = '1' then
+            if ifetch_fe_t3 = '1' then
                state_next <= S_0;
             else
                state_next <= S_CB_T4;
+            end if;
+         when S_DDFD_T4 =>
+            if ifetch_fe_t3 = '1' and opcode_ddfd = '1' then
+               state_next <= S_DDFD_T4;
+            elsif ifetch_fe_t3 = '1' then
+               state_next <= S_0;
+            else
+               state_next <= S_DDFD_T4;
             end if;
          when others =>
             state_next <= S_0;
       end case;
    end process;
    
+   -- interrupt mode
+   
+   -- IM 0 : ED 46/4E/66/6E
+   -- IM 1 : ED 56/76
+   -- IM 2 : ED 5E/7E
+   
+   process (i_CLK_CPU)
+   begin
+      if falling_edge(i_CLK_CPU) then
+         if i_reset = '1' then
+            im_mode <= (others => '0');
+         elsif state = S_ED_T4 and ifetch_fe_t3 = '1' and cpu_opcode(7 downto 6) = "01" and cpu_opcode(2 downto 0) = "110" then
+            im_mode <= (cpu_opcode(4) and cpu_opcode(3)) & (cpu_opcode(4) and not cpu_opcode(3));
+         end if;
+      end if;
+   end process;
+   
+   o_im_mode <= im_mode;
    -- output signals
    
    o_reti_decode <= '1' when state = S_ED_T4 else '0';
@@ -201,6 +234,6 @@ begin
 
    o_retn_seen <= '1' when state_next = S_ED45_T4 else '0';
    
-   o_dma_delay <= '1' when state = S_ED_T4 or state = S_ED4D_T4 or state = S_SRL_T1 or state = S_SRL_T2 else '0';
+   o_dma_delay <= '1' when state = S_ED_T4 or state = S_ED4D_T4 or state = S_ED45_T4 or state = S_SRL_T1 or state = S_SRL_T2 else '0';
 
 end architecture;

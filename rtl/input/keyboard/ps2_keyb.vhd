@@ -93,10 +93,12 @@ architecture rtl of ps2_keyb is
    signal ps2_receive_valid_d    : std_logic;
    signal ps2_receive_valid_re   : std_logic;
    signal ps2_receive_data       : std_logic_vector(7 downto 0);
-   signal ps2_send_valid         : std_logic;
+   signal ps2_send_valid         : std_logic := '0';
 
    signal ps2_data_01            : std_logic;
    signal ps2_data_09            : std_logic;
+   signal ps2_data_1f            : std_logic;
+   signal ps2_data_27            : std_logic;
    signal ps2_data_aa            : std_logic;
    signal ps2_data_e0            : std_logic;
    signal ps2_data_e1            : std_logic;
@@ -122,7 +124,7 @@ begin
       if rising_edge(i_CLK) then
          if i_reset = '1' or ps2_matrix_reset = '1' then
             o_mf_nmi_n <= '1';
-         elsif ps2_key_valid = '1' and ps2_key_extend = '0' and ps2_data_01 = '1' then
+         elsif ps2_key_valid = '1' and ((ps2_key_extend = '0' and ps2_data_01 = '1') or (ps2_key_extend = '1' and ps2_data_1f = '1')) then
             o_mf_nmi_n <= ps2_key_release;
          end if;
       end if;
@@ -133,7 +135,7 @@ begin
       if rising_edge(i_CLK) then
          if i_reset = '1' or ps2_matrix_reset = '1' then
             o_divmmc_nmi_n <= '1';
-         elsif ps2_key_valid = '1' and ps2_key_extend = '0' and ps2_data_09 = '1' then
+         elsif ps2_key_valid = '1' and ((ps2_key_extend = '0' and ps2_data_09 = '1') or (ps2_key_extend = '1' and ps2_data_27 = '1')) then
             o_divmmc_nmi_n <= ps2_key_release;
          end if;
       end if;
@@ -240,7 +242,7 @@ begin
    ps2_key_valid <= '1' when ps2_code_valid = '1' and ps2_keymap_data(7 downto 6) /= "11" else '0';
    ps2_fk_valid <= '1' when ps2_code_valid = '1' and ps2_keymap_data(7 downto 6) = "11" else '0';
 
-   ps2_matrix_reset <= ps2_key_valid and ps2_data_e1;
+    ps2_matrix_reset <= (ps2_key_valid and ps2_data_e1) or ps2_send_valid;
    
    -- ps2 interface
    
@@ -262,7 +264,7 @@ begin
       ps2_data_out   => o_ps2_data_out_en, 
       ps2_clk_out    => o_ps2_clk_out_en, 
       data_rdy_i     => ps2_send_valid,
-      data_i         => X"55",
+      data_i         => X"F8",
       send_rdy_o     => open,
       data_rdy_o     => ps2_receive_valid,
       data_o         => ps2_receive_data,
@@ -310,6 +312,8 @@ begin
    begin
       ps2_data_01 <= '0';
       ps2_data_09 <= '0';
+	  ps2_data_1f <= '0';
+      ps2_data_27 <= '0';
       ps2_data_aa <= '0';
       ps2_data_e0 <= '0';
       ps2_data_e1 <= '0';
@@ -317,6 +321,8 @@ begin
       case ps2_receive_data is
          when X"01" => ps2_data_01 <= '1';
          when X"09" => ps2_data_09 <= '1';
+		 when X"1F" => ps2_data_1f <= '1';
+         when X"27" => ps2_data_27 <= '1';
          when X"AA" => ps2_data_aa <= '1';
          when X"E0" => ps2_data_e0 <= '1';
          when X"E1" => ps2_data_e1 <= '1';
