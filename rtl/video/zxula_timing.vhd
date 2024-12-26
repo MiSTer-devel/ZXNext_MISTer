@@ -166,7 +166,7 @@ begin
          c_min_vsync   <= to_unsigned(1, 9);        -- displays don't like vsync = vblank
          c_max_vsync   <= to_unsigned(14, 9);
          c_max_vblank  <= to_unsigned(15, 9);
-         c_min_vactive <= to_unsigned(80, 9);       -- 256x192 area
+         c_min_vactive <= to_unsigned(80 -1, 9);       -- 256x192 area   --center area in mister
          c_max_vc      <= to_unsigned(319, 9);
          
          -- hdmi 360x288
@@ -202,7 +202,7 @@ begin
             c_min_vsync   <= to_unsigned(1, 9);     -- displays don't like vsync = vblank
             c_max_vsync   <= to_unsigned(4, 9);
             c_max_vblank  <= to_unsigned(7, 9);
-            c_min_vactive <= to_unsigned(64, 9);    -- 256x192 area
+            c_min_vactive <= to_unsigned(64 -1, 9);    -- 256x192 area   --center area in mister
             c_max_vc      <= to_unsigned(310, 9);
          
             -- hdmi 360x288
@@ -268,7 +268,7 @@ begin
             c_min_vsync   <= to_unsigned(1, 9);     -- displays don't like vsync = vblank
             c_max_vsync   <= to_unsigned(4, 9);
             c_max_vblank  <= to_unsigned(7, 9);
-            c_min_vactive <= to_unsigned(64, 9);    -- 256x192 area
+            c_min_vactive <= to_unsigned(64 -1, 9);    -- 256x192 area  --center area in mister
             c_max_vc      <= to_unsigned(311, 9);
          
             -- hdmi 360x288
