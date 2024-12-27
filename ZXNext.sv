@@ -199,7 +199,7 @@ assign HDMI_BLACKOUT = 0;
 // 0         1         2         3          4         5         6
 // 01234567890123456789012345678901 23456789012345678901234567890123
 // 0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
-// XXXXXXXXXXXXXXX            XXXXXX
+// XXXXXXXXXXXXXXXX            XXXXXX
 
 
 `include "build_id.v" 
@@ -214,6 +214,7 @@ localparam CONF_STR = {
 	"O78,Aspect Ratio,Original,Full Screen,[ARC1],[ARC2];",
 	"O56,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%;",
 	"ODE,Narrow Border,No,276,288,320;",
+        "OF,Center Image,Yes,No;",
 	"H2d1OS,Vertical Crop,No,Yes;",
 	"h2d1OST,Vertical Crop,No,270,216;",
 	"OQR,Scale,Normal,V-Integer,Narrower HV-Integer,Wider HV-Integer;",
@@ -402,7 +403,8 @@ zxnext_top zxnext_top
 	.RGB_HS_n      (HSync_n),
 	.RGB_VB_n      (VBlank_n),
 	.RGB_HB_n      (HBlank_n),
-	.RGB_NTSC      (ntsc)
+	.RGB_NTSC      (ntsc),
+	.center        (status[15])
 );
 
 reg hw_reset = 0;

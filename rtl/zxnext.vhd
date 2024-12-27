@@ -158,7 +158,7 @@ entity zxnext is
       o_HDMI_RESET         : out std_logic;
       o_HDMI_PIXEL         : out std_logic;                       -- pixel available
       o_HDMI_LOCK          : out std_logic;                       -- frame lock
-      
+      center			   : in std_logic;
       -- AUDIO
       
       o_AUDIO_HDMI_AUDIO_EN : out std_logic;
@@ -6677,6 +6677,7 @@ begin
       o_wvc              => wvc,
       
       o_phc              => phc,
+      center			 => center,
       
       -- 28 MHz domain
       
