@@ -65,7 +65,7 @@ entity zxula_timing is
       o_wvc              : out unsigned(8 downto 0);          -- wide vertical count for 320x256
       
       o_phc              : out unsigned(8 downto 0);          -- practical horizontal count for 256x192
-      
+      center			 : in std_logic;
       -- 28 MHz domain
       
       o_sc               : out std_logic_vector(1 downto 0);  -- 28 MHz sub pixel counter (four per pixel)
@@ -141,14 +141,14 @@ architecture rtl of zxula_timing is
    signal int_ula              : std_logic := '0';
    signal int_line             : std_logic := '0';
    signal int_line_num         : unsigned(8 downto 0) := (others => '0');
-   
+
 begin
 
    -- display dimensions
 
    process (i_timing, i_50_60)
    begin
-   
+      
       if i_timing(2) = '1' then
       
          -- Pentagon
@@ -158,7 +158,11 @@ begin
          c_min_hsync   <= to_unsigned(16, 9);       -- displays don't like hsync = hblank
          c_max_hsync   <= to_unsigned(47, 9);
          c_max_hblank  <= to_unsigned(63, 9);
-         c_min_hactive <= to_unsigned(128 +12, 9);      -- 256x192 area  --center area in mister
+         if center = '0' then
+            c_min_hactive <= to_unsigned(128 +12, 9);      -- 256x192 area  --center area in mister
+         else
+            c_min_hactive <= to_unsigned(128, 9);      -- 256x192 area
+         end if; 
          c_max_hc      <= to_unsigned(447, 9);
          
          c_min_vblank  <= to_unsigned(0, 9);
@@ -166,7 +170,11 @@ begin
          c_min_vsync   <= to_unsigned(1, 9);        -- displays don't like vsync = vblank
          c_max_vsync   <= to_unsigned(14, 9);
          c_max_vblank  <= to_unsigned(15, 9);
-         c_min_vactive <= to_unsigned(80, 9);       -- 256x192 area
+         if center = '0' then
+            c_min_vactive <= to_unsigned(80 -1, 9);       -- 256x192 area   --center area in mister
+         else	
+            c_min_vactive <= to_unsigned(80, 9);       -- 256x192 area
+         end if;
          c_max_vc      <= to_unsigned(319, 9);
          
          -- hdmi 360x288
@@ -194,7 +202,11 @@ begin
             c_min_hsync   <= to_unsigned(16, 9);
             c_max_hsync   <= to_unsigned(47, 9);
             c_max_hblank  <= to_unsigned(95, 9);
-            c_min_hactive <= to_unsigned(136 + 12, 9);   -- 256x192 area  --center area in mister
+            if center = '0' then
+                c_min_hactive <= to_unsigned(136 + 12, 9);   -- 256x192 area  --center area in mister
+            else 
+                c_min_hactive <= to_unsigned(136, 9);   -- 256x192 area
+            end if;
             c_max_hc      <= to_unsigned(455, 9);
          
             c_min_vblank  <= to_unsigned(0, 9);
@@ -202,7 +214,11 @@ begin
             c_min_vsync   <= to_unsigned(1, 9);     -- displays don't like vsync = vblank
             c_max_vsync   <= to_unsigned(4, 9);
             c_max_vblank  <= to_unsigned(7, 9);
-            c_min_vactive <= to_unsigned(64, 9);    -- 256x192 area
+            if center  ='0' then
+                c_min_vactive <= to_unsigned(64 -1, 9);    -- 256x192 area   --center area in mister
+            else
+                c_min_vactive <= to_unsigned(64, 9);    -- 256x192 area
+            end if; 
             c_max_vc      <= to_unsigned(310, 9);
          
             -- hdmi 360x288
@@ -228,7 +244,11 @@ begin
             c_min_hsync   <= to_unsigned(16, 9);
             c_max_hsync   <= to_unsigned(47, 9);
             c_max_hblank  <= to_unsigned(95, 9);
-            c_min_hactive <= to_unsigned(136 + 12, 9);   -- 256x192 area  --center area in mister
+            if center ='0' then
+                c_min_hactive <= to_unsigned(136 + 12, 9);   -- 256x192 area  --center area in mister
+            else
+                c_min_hactive <= to_unsigned(136, 9);   -- 256x192 area
+            end if;
             c_max_hc      <= to_unsigned(455, 9);
          
             c_min_vblank  <= to_unsigned(0, 9);
@@ -260,7 +280,11 @@ begin
             c_min_hsync   <= to_unsigned(16, 9);
             c_max_hsync   <= to_unsigned(47, 9);
             c_max_hblank  <= to_unsigned(95, 9);
-            c_min_hactive <= to_unsigned(128 +12, 9);   -- 256x192 area  --center area in mister
+            if center ='0' then
+                c_min_hactive <= to_unsigned(128 +12, 9);   -- 256x192 area  --center area in mister
+            else
+                c_min_hactive <= to_unsigned(128, 9);   -- 256x192 area  --center area in mister
+            end if;
             c_max_hc      <= to_unsigned(447, 9);
          
             c_min_vblank  <= to_unsigned(0, 9);
@@ -268,7 +292,11 @@ begin
             c_min_vsync   <= to_unsigned(1, 9);     -- displays don't like vsync = vblank
             c_max_vsync   <= to_unsigned(4, 9);
             c_max_vblank  <= to_unsigned(7, 9);
-            c_min_vactive <= to_unsigned(64, 9);    -- 256x192 area
+            if center ='0' then
+                c_min_vactive <= to_unsigned(64 -1, 9);    -- 256x192 area  --center area in mister
+            else
+                c_min_vactive <= to_unsigned(64, 9);    -- 256x192 area
+            end if;
             c_max_vc      <= to_unsigned(311, 9);
          
             -- hdmi 360x288
@@ -288,7 +316,11 @@ begin
             c_min_hsync   <= to_unsigned(16, 9);
             c_max_hsync   <= to_unsigned(47, 9);
             c_max_hblank  <= to_unsigned(95, 9);
-            c_min_hactive <= to_unsigned(128 + 12, 9);   -- 256x192 area  --center area in mister
+            if center ='0' then
+                c_min_hactive <= to_unsigned(128 + 12, 9);   -- 256x192 area  --center area in mister
+            else
+                c_min_hactive <= to_unsigned(128 + 12, 9);   -- 256x192 area
+            end if;
             c_max_hc      <= to_unsigned(447, 9);
          
             c_min_vblank  <= to_unsigned(0, 9);

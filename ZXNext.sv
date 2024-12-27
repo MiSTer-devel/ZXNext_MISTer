@@ -199,7 +199,7 @@ assign HDMI_BLACKOUT = 0;
 // 0         1         2         3          4         5         6
 // 01234567890123456789012345678901 23456789012345678901234567890123
 // 0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
-// XXXXXXXXXXXXX              XXXX
+// XXXXXXXXXXXXXXXX            XXXXXX
 
 
 `include "build_id.v" 
@@ -213,6 +213,8 @@ localparam CONF_STR = {
    "-;",
 	"O78,Aspect Ratio,Original,Full Screen,[ARC1],[ARC2];",
 	"O56,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%;",
+	"ODE,Narrow Border,No,276,288,320;",
+        "OF,Center Image,Yes,No;",
 	"H2d1OS,Vertical Crop,No,Yes;",
 	"h2d1OST,Vertical Crop,No,270,216;",
 	"OQR,Scale,Normal,V-Integer,Narrower HV-Integer,Wider HV-Integer;",
@@ -401,7 +403,8 @@ zxnext_top zxnext_top
 	.RGB_HS_n      (HSync_n),
 	.RGB_VB_n      (VBlank_n),
 	.RGB_HB_n      (HBlank_n),
-	.RGB_NTSC      (ntsc)
+	.RGB_NTSC      (ntsc),
+	.center        (status[15])
 );
 
 reg hw_reset = 0;
@@ -445,7 +448,7 @@ always @(posedge CLK_VIDEO) begin
 	if(ce_pix) begin
 		hcnt <= hcnt + 1'd1;
 		if(~HBlank_n) hcnt <= 0;
-		narrow_hbl <= narrow && ((hcnt < 20) || (hcnt >= 700));
+		narrow_hbl <= (narrow && ((hcnt < 20) || (hcnt >= 700))) || (narrow_B1 && ((hcnt < 84) || (hcnt >= 636)))||(narrow_B2 && ((hcnt < 72) || (hcnt >= 648))) || (narrow_B3 && ((hcnt < 40) || (hcnt >= 680)));
 	end
 end
 
@@ -470,16 +473,28 @@ video_mixer #(.LINE_LENGTH(740), .GAMMA(1)) video_mixer
 );
 
 reg [9:0] vcrop;
-reg       narrow;
+reg  narrow;
+reg narrow_B1;
+reg narrow_B2;
+reg narrow_B3;
+
+
 always @(posedge CLK_VIDEO) begin
 	vcrop <= 0;
 	narrow <= 0;
+	narrow_B1 <= 0;
+	narrow_B2 <= 0;
+	narrow_B3 <= 0;
+
+	if (status[13] ==1 && status [14]==0) narrow_B1 <= status[13];
+	if (status[13] ==0 && status [14]==1) narrow_B2 <= status[14];
+	if (status[13] ==1 && status [14]==1) narrow_B3 <= status[13];
 	if(HDMI_WIDTH >= (HDMI_HEIGHT + HDMI_HEIGHT[11:1]) && !forced_scandoubler && !scale) begin
 		if(HDMI_HEIGHT == 480)  vcrop <= 240;
-		if(HDMI_HEIGHT == 600)  begin vcrop <= 200; narrow <= 1; end
+		if(HDMI_HEIGHT == 600)  begin vcrop <= 200; narrow <= vcrop_en; end
 		if(HDMI_HEIGHT == 720)  vcrop <= 240;
 		if(HDMI_HEIGHT == 768)  vcrop <= 256;
-		if(HDMI_HEIGHT == 800)  begin vcrop <= 200; narrow <= 1; end
+		if(HDMI_HEIGHT == 800)  begin vcrop <= 200; narrow <= vcrop_en; end
 		if(HDMI_HEIGHT == 1080) vcrop <= status[29] ? 10'd216 : 10'd270;
 		if(HDMI_HEIGHT == 1200) vcrop <= 240;
 	end
@@ -495,9 +510,9 @@ video_freak video_freak
 (
 	.*,
 	.VGA_DE_IN(vga_de),
-	.ARX((!ar) ? (narrow ? 12'd340 : 12'd360) : (ar - 1'd1)),
+	.ARX((!ar) ? (narrow_B3 ? 12'd320 :(narrow_B2 ? 12'd288 :(narrow_B1  ? 12'd276  : (narrow ? 12'd340 : 12'd360)))) : (ar - 1'd1)),
 	.ARY((!ar) ? (ntsc ? 12'd256 : 12'd303) : 12'd0),
-	.CROP_SIZE(vcrop_en ? vcrop : 10'd0),
+	.CROP_SIZE(narrow_B3 ? 12'd256 : (narrow_B2 ? 12'd216 : (narrow_B1 ? 12'd216  :(vcrop_en ? vcrop : 10'd0)))),
 	.CROP_OFF(0),
 	.SCALE(status[27:26])
 );

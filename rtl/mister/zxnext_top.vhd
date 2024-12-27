@@ -92,7 +92,7 @@ entity zxnext_top is
 		RGB_VB_n          : out std_logic;                       -- vblank
 		RGB_HB_n          : out std_logic;                       -- hblank
 		RGB_NTSC          : out std_logic;
-
+		center			  : in std_logic;
 		-- I2C (RTC)
 		i2c_scl_o         : out std_logic;
 		i2c_sda_o         : out std_logic;
@@ -509,7 +509,8 @@ begin
       o_RGB_VB_n           => RGB_VB_n,
       o_RGB_HB_n           => RGB_HB_n,
       o_VIDEO_MODE         => zxn_video_mode,
-		o_VIDEO_50_60        => RGB_NTSC,
+      o_VIDEO_50_60        => RGB_NTSC,
+      center			   => center,
       
       -- AUDIO
       
