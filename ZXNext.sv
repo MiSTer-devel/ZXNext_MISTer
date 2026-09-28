@@ -34,7 +34,9 @@ assign LED_POWER = 0;
 assign LED_USER = sd_act | tape_led;
 assign BUTTONS = 0;
 
-assign UART_RTS = 0;
+// NextReg $02 bit 7: expose the Next peripheral/ESP reset to Linux as CTS.
+wire esp_reset;
+assign UART_RTS = esp_reset;
 assign UART_DTR = 0;
 
 assign VGA_SCALER = 0;
@@ -243,6 +245,7 @@ zxnext_top zxnext_top
 
 	.uart_rx_i     (UART_RXD),
 	.uart_tx_o     (UART_TXD),
+	.esp_reset_o   (esp_reset),
 
 	.i2c_scl_o     (i2c_scl_o),
 	.i2c_sda_o     (i2c_sda_o),

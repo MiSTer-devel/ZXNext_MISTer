@@ -99,7 +99,8 @@ entity zxnext_top is
 		i2c_sda_i         : in  std_logic := '1';
 
 		uart_rx_i         : in  std_logic;
-		uart_tx_o         : out std_logic
+		uart_tx_o         : out std_logic;
+		esp_reset_o       : out std_logic
 		
 	);
 end entity;
@@ -437,6 +438,7 @@ begin
 
       i_RESET              => reset,
       i_BOOT               => ps2_kbd_fn(1) or HW_RESET,
+      o_RESET_PERIPHERAL   => esp_reset_o,
       
       o_RESET_HARD         => zxn_reset_hard,
       o_RESET_SOFT         => zxn_reset_soft,
